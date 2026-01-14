@@ -1,0 +1,207 @@
+<mxfile host="app.diagrams.net" modified="2024-12-18T00:00:00.000Z" agent="5.0" version="21.0.0" etag="lucid-architecture" type="device">
+  <diagram name="Open-Source MPC Architecture" id="opensource-mpc">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1654" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Open-Source MPC Architecture - AI Search 2.0" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="769" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- User Layer -->
+        <mxCell id="user" value="User" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="80" y="100" width="30" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- API Gateway / Load Balancer -->
+        <mxCell id="alb" value="Application Load Balancer&#xa;(ALB)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="200" y="90" width="180" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- ECS Cluster -->
+        <mxCell id="ecs-cluster" value="ECS Cluster&#xa;(MPC API Service)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="450" y="90" width="200" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- ECS Tasks -->
+        <mxCell id="ecs-task1" value="ECS Task 1&#xa;MPC Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="420" y="200" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ecs-task2" value="ECS Task 2&#xa;MPC Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="560" y="200" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- EC2 GPU Instance -->
+        <mxCell id="ec2-gpu" value="EC2 Instance&#xa;(g4dn.xlarge)&#xa;GPU: NVIDIA T4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="750" y="90" width="200" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Ollama Container -->
+        <mxCell id="ollama" value="Ollama Runtime&#xa;+ Llama 7B Model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="770" y="200" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- SearxNG Instance -->
+        <mxCell id="searxng" value="EC2 Instance&#xa;(t3.small)&#xa;SearxNG" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="750" y="300" width="200" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- SearxNG Container -->
+        <mxCell id="searxng-container" value="SearxNG Container&#xa;Web Search Aggregator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="770" y="410" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- RDS PostgreSQL -->
+        <mxCell id="rds" value="RDS PostgreSQL&#xa;(UAT Database)&#xa;Read-Only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="200" y="300" width="200" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Database Tables -->
+        <mxCell id="tables" value="Tables:&#xa;• tickets_orders&#xa;• master_ticketing_groups&#xa;• master_events&#xa;• venues&#xa;• carts" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="220" y="400" width="160" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Components Box -->
+        <mxCell id="components-box" value="MPC Service Components" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="450" y="300" width="250" height="200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="comp1" value="• LLM Intent Analyzer" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="460" y="330" width="230" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="comp2" value="• SQL Agent (LangChain)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="460" y="360" width="230" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="comp3" value="• Conversation Memory" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="460" y="390" width="230" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="comp4" value="• Response Formatter" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="460" y="420" width="230" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="comp5" value="• Search Services" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="460" y="450" width="230" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows -->
+        <mxCell id="arrow1" value="" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="user" target="alb">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="400" as="sourcePoint" />
+            <mxPoint x="450" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow2" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="alb" target="ecs-cluster">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="400" as="sourcePoint" />
+            <mxPoint x="450" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow3" value="LLM&#xa;Calls" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="ecs-cluster" target="ec2-gpu">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="400" as="sourcePoint" />
+            <mxPoint x="450" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow4" value="Web&#xa;Search" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="ecs-cluster" target="searxng">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="400" as="sourcePoint" />
+            <mxPoint x="450" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow5" value="SQL&#xa;Queries" style="endArrow=classic;html=1;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="ecs-cluster" target="rds">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="400" as="sourcePoint" />
+            <mxPoint x="450" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Cost Box -->
+        <mxCell id="cost-box" value="Monthly Costs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="200" y="550" width="750" height="120" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cost1" value="• EC2 GPU (g4dn.xlarge): ~$360/month (or $108/month with Spot)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="580" width="350" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cost2" value="• EC2 SearxNG (t3.small): ~$15/month" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="610" width="350" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cost3" value="• ECS Cluster: ~$20/month (management)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="640" width="350" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cost4" value="• RDS PostgreSQL: Existing (no additional cost)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="600" y="580" width="330" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cost5" value="• ALB: ~$20/month" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="600" y="610" width="330" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="cost-total" value="Total: ~$415-667/month (vs $3,000+/month for APIs at scale)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="220" y="660" width="710" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Legend -->
+        <mxCell id="legend-box" value="Legend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="200" y="700" width="750" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend1" value="🟢 Green: Load Balancer / Database" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="730" width="350" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend2" value="🟡 Yellow: Application Services (ECS)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="220" y="760" width="350" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend3" value="🔴 Red: LLM Infrastructure (GPU)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="600" y="730" width="330" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend4" value="🟣 Purple: Web Search (SearxNG)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="600" y="760" width="330" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Flow Labels -->
+        <mxCell id="flow-label1" value="1. User Query" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="95" y="70" width="80" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="flow-label2" value="2. Route Request" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="70" width="80" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="flow-label3" value="3. Process Query" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="500" y="70" width="80" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="flow-label4" value="4. LLM Processing" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="70" width="100" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="flow-label5" value="5. Web Context" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="280" width="100" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="flow-label6" value="6. Database Query" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="280" y="280" width="100" height="20" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+
