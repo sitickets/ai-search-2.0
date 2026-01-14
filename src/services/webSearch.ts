@@ -22,11 +22,13 @@ export class WebSearchService {
   private serpApiKey?: string;
   private googleApiKey?: string;
   private googleSearchEngineId?: string;
+  private braveApiKey?: string;
 
   constructor() {
     this.serpApiKey = process.env.SERP_API_KEY;
     this.googleApiKey = process.env.GOOGLE_SEARCH_API_KEY;
     this.googleSearchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
+    this.braveApiKey = process.env.BRAVE_SEARCH_API_KEY;
   }
 
   /**
@@ -35,18 +37,83 @@ export class WebSearchService {
   async search(params: WebSearchParams): Promise<WebSearchResult[]> {
     const { query, limit = 5, type = 'general' } = params;
 
-    // Try SerpAPI first (more reliable, free tier available)
+    // Try Brave Search API first (open-source index, free tier)
+    if (this.braveApiKey) {
+      try {
+        return await this.searchWithBraveAPI(query, limit, type);
+      } catch (error) {
+        console.error('Brave API search error:', error);
+        // Fall through to next option
+      }
+    }
+
+    // Try SerpAPI (more reliable, free tier available)
     if (this.serpApiKey) {
-      return await this.searchWithSerpAPI(query, limit, type);
+      try {
+        return await this.searchWithSerpAPI(query, limit, type);
+      } catch (error) {
+        console.error('SerpAPI search error:', error);
+        // Fall through to next option
+      }
     }
 
     // Fallback to Google Custom Search API
     if (this.googleApiKey && this.googleSearchEngineId) {
-      return await this.searchWithGoogleAPI(query, limit, type);
+      try {
+        return await this.searchWithGoogleAPI(query, limit, type);
+      } catch (error) {
+        console.error('Google API search error:', error);
+        // Fall through to next option
+      }
     }
 
-    // Fallback to DuckDuckGo (no API key needed, but less reliable)
-    return await this.searchWithDuckDuckGo(query, limit, type);
+    // Last resort: Return empty results (don't use unreliable HTML scraping)
+    console.warn('All web search APIs unavailable, returning empty results');
+    return [];
+  }
+
+  /**
+   * Search using Brave Search API
+   * Free tier: 2,000 queries/month
+   * Paid: $3 per 1,000 queries after free tier
+   */
+  private async searchWithBraveAPI(
+    query: string,
+    limit: number,
+    type: string
+  ): Promise<WebSearchResult[]> {
+    try {
+      const enhancedQuery = this.enhanceQueryForType(query, type);
+      const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+        headers: {
+          'X-Subscription-Token': this.braveApiKey!
+        },
+        params: {
+          q: enhancedQuery,
+          count: Math.min(limit, 20), // Brave API max is 20 per request
+          safesearch: 'moderate',
+          freshness: 'pd' // Past day for recent results
+        },
+        timeout: 10000
+      });
+
+      const results: WebSearchResult[] = [];
+      if (response.data.web && response.data.web.results) {
+        response.data.web.results.slice(0, limit).forEach((result: any) => {
+          results.push({
+            title: result.title,
+            snippet: result.description || '',
+            url: result.url,
+            source: 'Brave Search'
+          });
+        });
+      }
+
+      return results;
+    } catch (error: any) {
+      console.error('Brave API search error:', error.message);
+      throw error; // Re-throw to allow fallback
+    }
   }
 
   /**
@@ -87,8 +154,7 @@ export class WebSearchService {
       return results;
     } catch (error: any) {
       console.error('SerpAPI search error:', error.message);
-      // Fallback to DuckDuckGo
-      return await this.searchWithDuckDuckGo(query, limit, type);
+      throw error; // Re-throw to allow fallback
     }
   }
 
@@ -128,61 +194,7 @@ export class WebSearchService {
       return results;
     } catch (error: any) {
       console.error('Google API search error:', error.message);
-      // Fallback to DuckDuckGo
-      return await this.searchWithDuckDuckGo(query, limit, type);
-    }
-  }
-
-  /**
-   * Search using DuckDuckGo (no API key required)
-   * Uses HTML scraping - less reliable but free
-   */
-  private async searchWithDuckDuckGo(
-    query: string,
-    limit: number,
-    type: string
-  ): Promise<WebSearchResult[]> {
-    try {
-      const enhancedQuery = this.enhanceQueryForType(query, type);
-      const response = await axios.get('https://html.duckduckgo.com/html/', {
-        params: {
-          q: enhancedQuery
-        },
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
-        timeout: 10000
-      });
-
-      // Parse HTML response (simplified - would need proper HTML parsing in production)
-      const results: WebSearchResult[] = [];
-      const html = response.data;
-      
-      // Simple regex-based extraction (for production, use cheerio or similar)
-      const titleRegex = /<a class="result__a"[^>]*>([^<]+)<\/a>/g;
-      const snippetRegex = /<a class="result__snippet"[^>]*>([^<]+)<\/a>/g;
-      const urlRegex = /href="([^"]+)"/g;
-
-      let match;
-      let count = 0;
-      while ((match = titleRegex.exec(html)) !== null && count < limit) {
-        const title = match[1];
-        const urlMatch = urlRegex.exec(html.substring(match.index));
-        const url = urlMatch ? urlMatch[1] : '';
-        
-        results.push({
-          title: title.trim(),
-          snippet: '', // DuckDuckGo HTML parsing is complex
-          url: url,
-          source: 'DuckDuckGo'
-        });
-        count++;
-      }
-
-      return results;
-    } catch (error: any) {
-      console.error('DuckDuckGo search error:', error.message);
-      return [];
+      throw error; // Re-throw to allow fallback
     }
   }
 
