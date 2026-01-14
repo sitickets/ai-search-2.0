@@ -4,23 +4,26 @@
  */
 
 import { Pool, PoolClient } from 'pg';
+import { config } from '../config/env';
 
 let pool: Pool | null = null;
 
 export function getPool(): Pool {
   if (!pool) {
-    if (!process.env.POSTGRES_DATABASE_URL) {
+    const dbConfig = config.database;
+    
+    if (!dbConfig.url()) {
       throw new Error('POSTGRES_DATABASE_URL environment variable is required');
     }
 
     pool = new Pool({
-      connectionString: process.env.POSTGRES_DATABASE_URL,
+      connectionString: dbConfig.url(),
       ssl: {
         rejectUnauthorized: false
       },
-      max: 20, // Maximum number of clients in the pool
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000,
+      max: dbConfig.poolMax(),
+      idleTimeoutMillis: dbConfig.poolIdleTimeout(),
+      connectionTimeoutMillis: dbConfig.poolConnectionTimeout(),
     });
 
     // Handle pool errors

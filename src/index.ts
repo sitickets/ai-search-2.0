@@ -8,15 +8,19 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { searchRouter } from './routes/search';
 import { healthRouter } from './routes/health';
+import { config } from './config/env';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = config.server.port();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: config.cors.origin() === '*' ? '*' : config.cors.origin().split(','),
+  credentials: true
+}));
 app.use(express.json());
 
 // Routes
@@ -38,8 +42,9 @@ app.get('/', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
+  const host = process.env.HOST || 'localhost';
   console.log(`🚀 AI Search 2.0 server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`📊 Environment: ${config.server.nodeEnv()}`);
+  console.log(`🔗 Health check: http://${host}:${PORT}/api/health`);
 });
 

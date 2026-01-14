@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import { config } from '../config/env';
 
 export interface WebSearchResult {
   title: string;
@@ -19,16 +20,13 @@ export interface WebSearchParams {
 }
 
 export class WebSearchService {
-  private serpApiKey?: string;
-  private googleApiKey?: string;
-  private googleSearchEngineId?: string;
-  private braveApiKey?: string;
+  private braveConfig = config.webSearch.brave;
+  private serpConfig = config.webSearch.serp;
+  private googleConfig = config.webSearch.google;
+  private searxngConfig = config.webSearch.searxng;
 
   constructor() {
-    this.serpApiKey = process.env.SERP_API_KEY;
-    this.googleApiKey = process.env.GOOGLE_SEARCH_API_KEY;
-    this.googleSearchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID;
-    this.braveApiKey = process.env.BRAVE_SEARCH_API_KEY;
+    // Config loaded from env.ts
   }
 
   /**
@@ -38,7 +36,7 @@ export class WebSearchService {
     const { query, limit = 5, type = 'general' } = params;
 
     // Try Brave Search API first (open-source index, free tier)
-    if (this.braveApiKey) {
+    if (this.braveConfig.apiKey()) {
       try {
         return await this.searchWithBraveAPI(query, limit, type);
       } catch (error) {
@@ -47,8 +45,18 @@ export class WebSearchService {
       }
     }
 
+    // Try SearxNG (self-hosted, if configured)
+    if (this.searxngConfig.url()) {
+      try {
+        return await this.searchWithSearxNG(query, limit, type);
+      } catch (error) {
+        console.error('SearxNG search error:', error);
+        // Fall through to next option
+      }
+    }
+
     // Try SerpAPI (more reliable, free tier available)
-    if (this.serpApiKey) {
+    if (this.serpConfig.apiKey()) {
       try {
         return await this.searchWithSerpAPI(query, limit, type);
       } catch (error) {
@@ -58,7 +66,7 @@ export class WebSearchService {
     }
 
     // Fallback to Google Custom Search API
-    if (this.googleApiKey && this.googleSearchEngineId) {
+    if (this.googleConfig.apiKey() && this.googleConfig.engineId()) {
       try {
         return await this.searchWithGoogleAPI(query, limit, type);
       } catch (error) {
@@ -84,9 +92,9 @@ export class WebSearchService {
   ): Promise<WebSearchResult[]> {
     try {
       const enhancedQuery = this.enhanceQueryForType(query, type);
-      const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
+      const response = await axios.get(this.braveConfig.apiUrl(), {
         headers: {
-          'X-Subscription-Token': this.braveApiKey!
+          'X-Subscription-Token': this.braveConfig.apiKey()!
         },
         params: {
           q: enhancedQuery,
@@ -94,7 +102,7 @@ export class WebSearchService {
           safesearch: 'moderate',
           freshness: 'pd' // Past day for recent results
         },
-        timeout: 10000
+        timeout: this.braveConfig.timeout()
       });
 
       const results: WebSearchResult[] = [];
@@ -120,6 +128,46 @@ export class WebSearchService {
    * Search using SerpAPI (serpapi.com)
    * Free tier: 100 searches/month
    */
+  /**
+   * Search using SearxNG (self-hosted metasearch engine)
+   * Open-source alternative to commercial APIs
+   */
+  private async searchWithSearxNG(
+    query: string,
+    limit: number,
+    type: string
+  ): Promise<WebSearchResult[]> {
+    try {
+      const enhancedQuery = this.enhanceQueryForType(query, type);
+      const searxngUrl = this.searxngConfig.url()!;
+      const response = await axios.get(`${searxngUrl}/search`, {
+        params: {
+          q: enhancedQuery,
+          format: 'json',
+          engines: 'google,bing,duckduckgo'
+        },
+        timeout: this.searxngConfig.timeout()
+      });
+
+      const results: WebSearchResult[] = [];
+      if (response.data.results) {
+        response.data.results.slice(0, limit).forEach((result: any) => {
+          results.push({
+            title: result.title,
+            snippet: result.content || '',
+            url: result.url,
+            source: 'SearxNG'
+          });
+        });
+      }
+
+      return results;
+    } catch (error: any) {
+      console.error('SearxNG search error:', error.message);
+      throw error;
+    }
+  }
+
   private async searchWithSerpAPI(
     query: string,
     limit: number,
@@ -127,16 +175,16 @@ export class WebSearchService {
   ): Promise<WebSearchResult[]> {
     try {
       const enhancedQuery = this.enhanceQueryForType(query, type);
-      const response = await axios.get('https://serpapi.com/search.json', {
+      const response = await axios.get(this.serpConfig.apiUrl(), {
         params: {
-          api_key: this.serpApiKey,
+          api_key: this.serpConfig.apiKey(),
           q: enhancedQuery,
           engine: 'google',
           num: limit,
           hl: 'en',
           gl: 'us'
         },
-        timeout: 10000
+        timeout: this.serpConfig.timeout()
       });
 
       const results: WebSearchResult[] = [];
@@ -169,14 +217,14 @@ export class WebSearchService {
   ): Promise<WebSearchResult[]> {
     try {
       const enhancedQuery = this.enhanceQueryForType(query, type);
-      const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+      const response = await axios.get(this.googleConfig.apiUrl(), {
         params: {
-          key: this.googleApiKey,
-          cx: this.googleSearchEngineId,
+          key: this.googleConfig.apiKey(),
+          cx: this.googleConfig.engineId(),
           q: enhancedQuery,
           num: Math.min(limit, 10) // Google API max is 10 per request
         },
-        timeout: 10000
+        timeout: this.googleConfig.timeout()
       });
 
       const results: WebSearchResult[] = [];

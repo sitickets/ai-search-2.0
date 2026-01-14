@@ -32,6 +32,9 @@
     "typeorm": "^0.3.17",
     "axios": "^1.6.2"
   },
+  "peerDependencies": {
+    "@langchain/core": "^0.1.0"
+  },
   "devDependencies": {
     "@types/node": "^20.10.5",
     "@types/pg": "^8.10.9",

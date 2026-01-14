@@ -25,15 +25,21 @@ export interface MPCResponse {
   metadata?: Record<string, any>;
 }
 
+import { config } from '../config/env';
+
 export class MPCService {
   private llm: ChatOpenAI | null = null;
 
   constructor() {
-    if (process.env.OPENAI_API_KEY) {
+    const llmConfig = config.llm.openai;
+    if (llmConfig.apiKey()) {
       this.llm = new ChatOpenAI({
-        modelName: 'gpt-4',
-        temperature: 0,
-        openAIApiKey: process.env.OPENAI_API_KEY,
+        modelName: llmConfig.model(),
+        temperature: llmConfig.temperature(),
+        openAIApiKey: llmConfig.apiKey(),
+        configuration: {
+          baseURL: llmConfig.baseUrl(),
+        },
       });
     }
   }
