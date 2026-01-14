@@ -56,34 +56,41 @@ const response = await axios.get('http://your-searx-instance:8080/search', {
 
 ---
 
-### Option 2: DuckDuckGo HTML API (Free, No API Key)
+### Option 2: DuckDuckGo HTML Scraping (NOT Recommended)
 
 **What it is:**
-- DuckDuckGo's HTML search (no official API)
+- **NOT an API** - HTML scraping of DuckDuckGo's search page
 - Free, no API key needed
-- Already implemented in your code as fallback
+- Currently implemented as fallback (but not recommended)
 
-**Usage:**
+**Important:** DuckDuckGo does **NOT** have a public web search API. They only have:
+- **Instant Answer API** - For structured data (definitions, facts), NOT web search
+- **HTML scraping** - What we're doing (unreliable, may violate ToS)
+
+**Usage (Current Implementation):**
 ```typescript
-// Already in your webSearch.ts
+// HTML scraping - NOT recommended
 const response = await axios.get('https://html.duckduckgo.com/html/', {
   params: { q: query }
 });
-// Parse HTML response
+// Parse HTML with regex (unreliable)
 ```
 
 **Cost:**
-- **$0** (completely free)
+- **$0** (but has risks)
 
 **Pros:**
 - ✅ Free
 - ✅ No API key
-- ✅ Already implemented
 
 **Cons:**
-- ❌ HTML parsing (less reliable)
-- ❌ Rate limiting (may get blocked)
-- ❌ Less structured results
+- ❌ **NOT an official API**
+- ❌ HTML parsing (unreliable, breaks when HTML changes)
+- ❌ May violate DuckDuckGo's Terms of Service
+- ❌ Rate limiting/blocking possible
+- ❌ Not suitable for production
+
+**Recommendation:** Remove this and use SearxNG or Brave/Bing APIs instead.
 
 ---
 
