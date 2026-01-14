@@ -4,9 +4,7 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai';
-import { SqlToolkit, createSqlAgent } from 'langchain/agents/toolkits/sql';
-import { DataSource } from 'typeorm';
-import { getPool, getSchemaInfo } from './database';
+import { getSchemaInfo } from './database';
 import { searchTickets, TicketSearchParams } from './search/ticketSearch';
 import { searchEvents, EventSearchParams } from './search/eventSearch';
 import { searchByPrice, PriceSearchParams } from './search/priceSearch';
@@ -28,7 +26,6 @@ export interface MPCResponse {
 
 export class MPCService {
   private llm: ChatOpenAI | null = null;
-  private sqlAgent: any = null;
 
   constructor() {
     if (process.env.OPENAI_API_KEY) {
