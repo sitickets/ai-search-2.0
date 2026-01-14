@@ -4,6 +4,8 @@ import { searchTickets } from '../services/search/ticketSearch';
 import { searchEvents } from '../services/search/eventSearch';
 import { searchByPrice } from '../services/search/priceSearch';
 import { searchByLocation } from '../services/search/locationSearch';
+import { enhancedSearchService } from '../services/enhancedSearch';
+import { webSearchService } from '../services/webSearch';
 
 const router = Router();
 
@@ -111,6 +113,69 @@ router.post('/location', async (req: Request, res: Response) => {
   try {
     const results = await searchByLocation(req.body);
     res.json({
+      results,
+      count: results.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/search/enhanced
+ * Enhanced search with web context
+ */
+router.post('/enhanced', async (req: Request, res: Response) => {
+  try {
+    const { query, includeWebContext = true } = req.body;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        error: 'Query is required and must be a string'
+      });
+    }
+
+    const results = await enhancedSearchService.comprehensiveSearch(query);
+
+    res.json({
+      query,
+      ...results,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/search/web
+ * Direct web search endpoint
+ */
+router.post('/web', async (req: Request, res: Response) => {
+  try {
+    const { query, type, limit } = req.body;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        error: 'Query is required and must be a string'
+      });
+    }
+
+    const results = await webSearchService.search({
+      query,
+      type,
+      limit: limit || 5
+    });
+
+    res.json({
+      query,
       results,
       count: results.length,
       timestamp: new Date().toISOString()

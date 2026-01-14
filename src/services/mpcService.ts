@@ -9,6 +9,7 @@ import { searchTickets, TicketSearchParams } from './search/ticketSearch';
 import { searchEvents, EventSearchParams } from './search/eventSearch';
 import { searchByPrice, PriceSearchParams } from './search/priceSearch';
 import { searchByLocation, LocationSearchParams } from './search/locationSearch';
+import { enhancedSearchService } from './enhancedSearch';
 
 export interface MPCQuery {
   query: string;
@@ -133,8 +134,27 @@ export class MPCService {
 
   private async handleTicketQuery(query: string, context?: Record<string, any>): Promise<MPCResponse> {
     const params = this.extractSearchParams(query, 'ticket') as TicketSearchParams;
+    const includeWebContext = context?.includeWebContext !== false;
+    
+    // Use enhanced search if web context is requested
+    if (includeWebContext) {
+      const enhancedResults = await enhancedSearchService.searchTicketsWithContext({
+        ...params,
+        includeWebContext: true
+      });
+      
+      return {
+        answer: `Found ${enhancedResults.length} tickets matching your search.`,
+        results: enhancedResults,
+        queryType: 'ticket',
+        metadata: { 
+          count: enhancedResults.length,
+          webContextIncluded: true
+        }
+      };
+    }
+    
     const results = await searchTickets(params);
-
     return {
       answer: `Found ${results.length} tickets matching your search.`,
       results,
@@ -145,8 +165,27 @@ export class MPCService {
 
   private async handleEventQuery(query: string, context?: Record<string, any>): Promise<MPCResponse> {
     const params = this.extractSearchParams(query, 'event') as EventSearchParams;
+    const includeWebContext = context?.includeWebContext !== false;
+    
+    // Use enhanced search if web context is requested
+    if (includeWebContext) {
+      const enhancedResults = await enhancedSearchService.searchEventsWithContext({
+        ...params,
+        includeWebContext: true
+      });
+      
+      return {
+        answer: `Found ${enhancedResults.length} events matching your search.`,
+        results: enhancedResults,
+        queryType: 'event',
+        metadata: { 
+          count: enhancedResults.length,
+          webContextIncluded: true
+        }
+      };
+    }
+    
     const results = await searchEvents(params);
-
     return {
       answer: `Found ${results.length} events matching your search.`,
       results,
@@ -180,19 +219,33 @@ export class MPCService {
   }
 
   private async handleGeneralQuery(query: string, context?: Record<string, any>): Promise<MPCResponse> {
-    // For general queries, try to use SQL Agent if available
-    if (this.llm) {
-      // TODO: Implement SQL Agent for complex queries
+    // For general queries, use comprehensive search with web context
+    try {
+      const comprehensiveResults = await enhancedSearchService.comprehensiveSearch(query);
+      
+      const totalResults = comprehensiveResults.tickets.length + comprehensiveResults.events.length;
+      
+      return {
+        answer: `Found ${comprehensiveResults.tickets.length} tickets and ${comprehensiveResults.events.length} events matching your search.`,
+        results: {
+          tickets: comprehensiveResults.tickets,
+          events: comprehensiveResults.events,
+          webContext: comprehensiveResults.webContext
+        },
+        queryType: 'general',
+        metadata: { 
+          ticketCount: comprehensiveResults.tickets.length,
+          eventCount: comprehensiveResults.events.length,
+          webContextIncluded: true
+        }
+      };
+    } catch (error: any) {
       return {
         answer: 'I can help you search for tickets, events, prices, and locations. Please be more specific about what you\'re looking for.',
-        queryType: 'general'
+        queryType: 'general',
+        metadata: { error: error.message }
       };
     }
-
-    return {
-      answer: 'I can help you search for tickets, events, prices, and locations. Please be more specific about what you\'re looking for.',
-      queryType: 'general'
-    };
   }
 }
 
