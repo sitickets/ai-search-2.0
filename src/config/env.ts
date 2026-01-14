@@ -20,42 +20,42 @@ const envSchema = z.object({
   
   // LLM Configuration
   OPENAI_API_KEY: z.string().optional(),
-  OPENAI_API_BASE_URL: z.string().url().optional().default('https://api.openai.com/v1'),
-  OPENAI_MODEL: z.string().default('gpt-4'),
-  OPENAI_TEMPERATURE: z.string().regex(/^\d+\.?\d*$/).transform(Number).default('0'),
+  OPENAI_API_BASE_URL: z.string().url().optional(),
+  OPENAI_MODEL: z.string().optional(),
+  OPENAI_TEMPERATURE: z.string().regex(/^\d+\.?\d*$/).transform(Number).optional(),
   
   ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_API_BASE_URL: z.string().url().optional().default('https://api.anthropic.com/v1'),
-  ANTHROPIC_MODEL: z.string().default('claude-3-sonnet-20240229'),
+  ANTHROPIC_API_BASE_URL: z.string().url().optional(),
+  ANTHROPIC_MODEL: z.string().optional(),
   
   // Self-Hosted LLM (Ollama)
-  OLLAMA_BASE_URL: z.string().url().optional().default('http://localhost:11434'),
-  OLLAMA_MODEL: z.string().default('llama2:7b'),
-  OLLAMA_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('30000'),
+  OLLAMA_BASE_URL: z.string().url().optional(),
+  OLLAMA_MODEL: z.string().optional(),
+  OLLAMA_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   // Web Search APIs
   BRAVE_SEARCH_API_KEY: z.string().optional(),
-  BRAVE_SEARCH_API_URL: z.string().url().optional().default('https://api.search.brave.com/res/v1/web/search'),
-  BRAVE_SEARCH_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('10000'),
+  BRAVE_SEARCH_API_URL: z.string().url().optional(),
+  BRAVE_SEARCH_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   SERP_API_KEY: z.string().optional(),
-  SERP_API_URL: z.string().url().optional().default('https://serpapi.com/search.json'),
-  SERP_API_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('10000'),
+  SERP_API_URL: z.string().url().optional(),
+  SERP_API_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   GOOGLE_SEARCH_API_KEY: z.string().optional(),
   GOOGLE_SEARCH_ENGINE_ID: z.string().optional(),
-  GOOGLE_SEARCH_API_URL: z.string().url().optional().default('https://www.googleapis.com/customsearch/v1'),
-  GOOGLE_SEARCH_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('10000'),
+  GOOGLE_SEARCH_API_URL: z.string().url().optional(),
+  GOOGLE_SEARCH_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   // Self-Hosted Web Search (SearxNG)
   SEARXNG_URL: z.string().url().optional(),
-  SEARXNG_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('10000'),
+  SEARXNG_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   // Vector Database (Optional - for RAG)
   PINECONE_API_KEY: z.string().optional(),
   PINECONE_ENVIRONMENT: z.string().optional(),
   PINECONE_INDEX_NAME: z.string().optional(),
-  PINECONE_API_URL: z.string().url().optional().default('https://api.pinecone.io'),
+  PINECONE_API_URL: z.string().url().optional(),
   
   // AWS Configuration
   AWS_REGION: z.string().default('us-east-1'),
@@ -98,41 +98,41 @@ export const config = {
   llm: {
     openai: {
       apiKey: () => getEnvConfig().OPENAI_API_KEY,
-      baseUrl: () => getEnvConfig().OPENAI_API_BASE_URL,
-      model: () => getEnvConfig().OPENAI_MODEL,
-      temperature: () => getEnvConfig().OPENAI_TEMPERATURE,
+      baseUrl: () => getEnvConfig().OPENAI_API_BASE_URL || 'https://api.openai.com/v1',
+      model: () => getEnvConfig().OPENAI_MODEL || 'gpt-4',
+      temperature: () => getEnvConfig().OPENAI_TEMPERATURE ?? 0,
     },
     anthropic: {
       apiKey: () => getEnvConfig().ANTHROPIC_API_KEY,
-      baseUrl: () => getEnvConfig().ANTHROPIC_API_BASE_URL,
-      model: () => getEnvConfig().ANTHROPIC_MODEL,
+      baseUrl: () => getEnvConfig().ANTHROPIC_API_BASE_URL || 'https://api.anthropic.com/v1',
+      model: () => getEnvConfig().ANTHROPIC_MODEL || 'claude-3-sonnet-20240229',
     },
     ollama: {
-      baseUrl: () => getEnvConfig().OLLAMA_BASE_URL,
-      model: () => getEnvConfig().OLLAMA_MODEL,
-      timeout: () => getEnvConfig().OLLAMA_TIMEOUT,
+      baseUrl: () => getEnvConfig().OLLAMA_BASE_URL || 'http://localhost:11434',
+      model: () => getEnvConfig().OLLAMA_MODEL || 'llama2:7b',
+      timeout: () => getEnvConfig().OLLAMA_TIMEOUT ?? 30000,
     },
   },
   webSearch: {
     brave: {
       apiKey: () => getEnvConfig().BRAVE_SEARCH_API_KEY,
-      apiUrl: () => getEnvConfig().BRAVE_SEARCH_API_URL,
-      timeout: () => getEnvConfig().BRAVE_SEARCH_TIMEOUT,
+      apiUrl: () => getEnvConfig().BRAVE_SEARCH_API_URL || 'https://api.search.brave.com/res/v1/web/search',
+      timeout: () => getEnvConfig().BRAVE_SEARCH_TIMEOUT ?? 10000,
     },
     serp: {
       apiKey: () => getEnvConfig().SERP_API_KEY,
-      apiUrl: () => getEnvConfig().SERP_API_URL,
-      timeout: () => getEnvConfig().SERP_API_TIMEOUT,
+      apiUrl: () => getEnvConfig().SERP_API_URL || 'https://serpapi.com/search.json',
+      timeout: () => getEnvConfig().SERP_API_TIMEOUT ?? 10000,
     },
     google: {
       apiKey: () => getEnvConfig().GOOGLE_SEARCH_API_KEY,
       engineId: () => getEnvConfig().GOOGLE_SEARCH_ENGINE_ID,
-      apiUrl: () => getEnvConfig().GOOGLE_SEARCH_API_URL,
-      timeout: () => getEnvConfig().GOOGLE_SEARCH_TIMEOUT,
+      apiUrl: () => getEnvConfig().GOOGLE_SEARCH_API_URL || 'https://www.googleapis.com/customsearch/v1',
+      timeout: () => getEnvConfig().GOOGLE_SEARCH_TIMEOUT ?? 10000,
     },
     searxng: {
       url: () => getEnvConfig().SEARXNG_URL,
-      timeout: () => getEnvConfig().SEARXNG_TIMEOUT,
+      timeout: () => getEnvConfig().SEARXNG_TIMEOUT ?? 10000,
     },
   },
   vectorDb: {
@@ -140,7 +140,7 @@ export const config = {
       apiKey: () => getEnvConfig().PINECONE_API_KEY,
       environment: () => getEnvConfig().PINECONE_ENVIRONMENT,
       indexName: () => getEnvConfig().PINECONE_INDEX_NAME,
-      apiUrl: () => getEnvConfig().PINECONE_API_URL,
+      apiUrl: () => getEnvConfig().PINECONE_API_URL || 'https://api.pinecone.io',
     },
   },
   aws: {
