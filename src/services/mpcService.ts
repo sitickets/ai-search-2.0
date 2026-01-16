@@ -3,7 +3,8 @@
  * Main service that orchestrates natural language queries and search operations
  */
 
-import { ChatOpenAI } from '@langchain/openai';
+// LangChain import - only used if OpenAI is configured (lazy import to avoid errors in Node 16)
+// import { ChatOpenAI } from '@langchain/openai';
 import { getSchemaInfo } from './database';
 import { searchTickets, TicketSearchParams } from './search/ticketSearch';
 import { searchEvents, EventSearchParams } from './search/eventSearch';
@@ -28,19 +29,27 @@ export interface MPCResponse {
 import { config } from '../config/env';
 
 export class MPCService {
-  private llm: ChatOpenAI | null = null;
+  private llm: any = null;
 
   constructor() {
+    // LangChain only used if OpenAI is configured (not used with Ollama)
+    // Lazy import to avoid ReadableStream errors in Node 16
     const llmConfig = config.llm.openai;
     if (llmConfig.apiKey()) {
-      this.llm = new ChatOpenAI({
-        modelName: llmConfig.model(),
-        temperature: llmConfig.temperature(),
-        openAIApiKey: llmConfig.apiKey(),
-        configuration: {
-          baseURL: llmConfig.baseUrl(),
-        },
-      });
+      try {
+        // Dynamic import to avoid loading LangChain if not needed
+        const { ChatOpenAI } = require('@langchain/openai');
+        this.llm = new ChatOpenAI({
+          modelName: llmConfig.model(),
+          temperature: llmConfig.temperature(),
+          openAIApiKey: llmConfig.apiKey(),
+          configuration: {
+            baseURL: llmConfig.baseUrl(),
+          },
+        });
+      } catch (error) {
+        console.warn('LangChain not available, using Ollama only:', error);
+      }
     }
   }
 
@@ -233,16 +242,18 @@ export class MPCService {
       
       return {
         answer: `Found ${comprehensiveResults.tickets.length} tickets and ${comprehensiveResults.events.length} events matching your search.`,
-        results: {
-          tickets: comprehensiveResults.tickets,
-          events: comprehensiveResults.events,
-          webContext: comprehensiveResults.webContext
-        },
+        results: [
+          ...comprehensiveResults.tickets,
+          ...comprehensiveResults.events
+        ] as any,
         queryType: 'general',
         metadata: { 
           ticketCount: comprehensiveResults.tickets.length,
           eventCount: comprehensiveResults.events.length,
-          webContextIncluded: true
+          webContextIncluded: true,
+          tickets: comprehensiveResults.tickets,
+          events: comprehensiveResults.events,
+          webContext: comprehensiveResults.webContext
         }
       };
     } catch (error: any) {

@@ -1,0 +1,170 @@
+service: ai-search-2-0
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${env:AWS_REGION, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 1024
+  timeout: 300  # 5 minutes (max for Lambda)
+  environment:
+    # Server Configuration
+    NODE_ENV: ${env:NODE_ENV, 'production'}
+    LOG_LEVEL: ${env:LOG_LEVEL, 'info'}
+    
+    # Database Configuration
+    POSTGRES_DATABASE_URL: ${env:POSTGRES_DATABASE_URL, ''}
+    POSTGRES_DATABASE_URL_RO: ${env:POSTGRES_DATABASE_URL_RO, ''}
+    DB_POOL_MAX: ${env:DB_POOL_MAX, '20'}
+    DB_POOL_IDLE_TIMEOUT: ${env:DB_POOL_IDLE_TIMEOUT, '30000'}
+    DB_POOL_CONNECTION_TIMEOUT: ${env:DB_POOL_CONNECTION_TIMEOUT, '10000'}
+    
+    # LLM Configuration (Ollama on EC2) - matching jira-feature-documentor pattern
+    LLM_BASE_URL: ${env:LLM_BASE_URL, ''}
+    LLM_MODEL: ${env:LLM_MODEL, 'llama3.1:8b-instruct'}
+    # Legacy Ollama env vars (for backward compatibility)
+    OLLAMA_BASE_URL: ${env:OLLAMA_BASE_URL, ''}
+    OLLAMA_MODEL: ${env:OLLAMA_MODEL, 'llama3.1:8b-instruct'}
+    OLLAMA_TIMEOUT: ${env:OLLAMA_TIMEOUT, '30000'}
+    
+    # OpenAI Configuration (optional)
+    OPENAI_API_KEY: ${env:OPENAI_API_KEY, ''}
+    OPENAI_API_BASE_URL: ${env:OPENAI_API_BASE_URL, ''}
+    OPENAI_MODEL: ${env:OPENAI_MODEL, ''}
+    OPENAI_TEMPERATURE: ${env:OPENAI_TEMPERATURE, '0'}
+    
+    # Anthropic Configuration (optional)
+    ANTHROPIC_API_KEY: ${env:ANTHROPIC_API_KEY, ''}
+    ANTHROPIC_API_BASE_URL: ${env:ANTHROPIC_API_BASE_URL, ''}
+    ANTHROPIC_MODEL: ${env:ANTHROPIC_MODEL, ''}
+    
+    # Web Search APIs
+    BRAVE_SEARCH_API_KEY: ${env:BRAVE_SEARCH_API_KEY, ''}
+    BRAVE_SEARCH_API_URL: ${env:BRAVE_SEARCH_API_URL, ''}
+    BRAVE_SEARCH_TIMEOUT: ${env:BRAVE_SEARCH_TIMEOUT, '10000'}
+    
+    SERP_API_KEY: ${env:SERP_API_KEY, ''}
+    SERP_API_URL: ${env:SERP_API_URL, ''}
+    SERP_API_TIMEOUT: ${env:SERP_API_TIMEOUT, '10000'}
+    
+    GOOGLE_SEARCH_API_KEY: ${env:GOOGLE_SEARCH_API_KEY, ''}
+    GOOGLE_SEARCH_ENGINE_ID: ${env:GOOGLE_SEARCH_ENGINE_ID, ''}
+    GOOGLE_SEARCH_API_URL: ${env:GOOGLE_SEARCH_API_URL, ''}
+    GOOGLE_SEARCH_TIMEOUT: ${env:GOOGLE_SEARCH_TIMEOUT, '10000'}
+    
+    # Self-Hosted Web Search (SearxNG)
+    SEARXNG_URL: ${env:SEARXNG_URL, ''}
+    SEARXNG_TIMEOUT: ${env:SEARXNG_TIMEOUT, '10000'}
+    
+    # Vector Database (Optional - for RAG)
+    PINECONE_API_KEY: ${env:PINECONE_API_KEY, ''}
+    PINECONE_ENVIRONMENT: ${env:PINECONE_ENVIRONMENT, ''}
+    PINECONE_INDEX_NAME: ${env:PINECONE_INDEX_NAME, ''}
+    PINECONE_API_URL: ${env:PINECONE_API_URL, ''}
+    
+    # CORS Configuration
+    CORS_ORIGIN: ${env:CORS_ORIGIN, '*'}
+    
+    # API Rate Limiting
+    RATE_LIMIT_WINDOW_MS: ${env:RATE_LIMIT_WINDOW_MS, '60000'}
+    RATE_LIMIT_MAX_REQUESTS: ${env:RATE_LIMIT_MAX_REQUESTS, '100'}
+  
+  # VPC Configuration (for accessing Ollama EC2 instance and RDS)
+  # WARNING: VPC configuration significantly increases cold start times (10-15 seconds)
+  # Only enable if required for database or LLM access
+  # For local dev (serverless offline), VPC is not needed - comment out
+  # For deployed Lambda accessing Ollama EC2, uncomment and set env vars:
+  # vpc:
+  #   securityGroupIds:
+  #     - ${env:LAMBDA_SECURITY_GROUP_ID}
+  #   subnetIds:
+  #     - ${env:LAMBDA_SUBNET_ID_1}
+  #     - ${env:LAMBDA_SUBNET_ID_2}
+  
+  httpApi:
+    cors:
+      allowedOrigins:
+        - '*'
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+
+functions:
+  api:
+    # For local dev, use handler. For deployment, use container image
+    handler: dist/handler.handler
+    # image:
+    #   uri: 210337553682.dkr.ecr.us-east-1.amazonaws.com/ai-search-2-0:latest
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+      - httpApi:
+          path: /
+          method: ANY
+
+plugins:
+  - serverless-dotenv-plugin
+  - serverless-offline
+
+custom:
+  dotenv:
+    # Load .env file automatically
+    path: .env
+    # Exclude reserved AWS variables
+    exclude:
+      - AWS_REGION  # Reserved by Lambda runtime
+    # Include all other env vars from .env
+    include:
+      - LLM_BASE_URL
+      - LLM_MODEL
+      - OLLAMA_BASE_URL
+      - OLLAMA_MODEL
+      - POSTGRES_DATABASE_URL
+      - POSTGRES_DATABASE_URL_RO
+      - CORS_ORIGIN
+  serverless-offline:
+    httpPort: 4000  # Changed from 3000 to avoid conflicts
+    lambdaPort: 4002  # Changed from 3002 to avoid conflicts
+    noPrependStageInUrl: true
+    host: 0.0.0.0
+
+package:
+  individually: true
+  excludeDevDependencies: true
+  exclude:
+    # Exclude large/unused packages
+    - 'node_modules/@langchain/**'
+    - 'node_modules/langchain/**'
+    - 'node_modules/typeorm/**'
+    - 'node_modules/@types/**'
+    - 'node_modules/typescript/**'
+    - 'node_modules/**/*.md'
+    - 'node_modules/**/*.txt'
+    - 'node_modules/**/test/**'
+    - 'node_modules/**/tests/**'
+    - 'node_modules/**/__tests__/**'
+    - 'node_modules/**/examples/**'
+    - 'node_modules/**/docs/**'
+    - 'node_modules/**/CHANGELOG*'
+    - 'node_modules/**/LICENSE*'
+    - 'node_modules/**/README*'
+    - 'node_modules/**/.github/**'
+    - 'node_modules/**/.git/**'
+    - '.env'
+    - '.env.*'
+    - '*.md'
+    - 'docs/**'
+    - '*.test.ts'
+    - '*.spec.ts'
+    - 'tsconfig.json'
+    - 'src/**'
+

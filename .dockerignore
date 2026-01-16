@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+*.md
+docs
+src
+tsconfig.json
+*.test.ts
+*.spec.ts
+.serverless
+.git
+.gitignore
+

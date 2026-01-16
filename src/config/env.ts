@@ -13,49 +13,51 @@ const envSchema = z.object({
   
   // Database Configuration
   POSTGRES_DATABASE_URL: z.string().url(),
-  POSTGRES_DATABASE_URL_RO: z.string().url().optional(), // Read-only endpoint
+  POSTGRES_DATABASE_URL_RO: z.string().url().or(z.literal('')).optional(), // Read-only endpoint
   DB_POOL_MAX: z.string().regex(/^\d+$/).transform(Number).default('20'),
   DB_POOL_IDLE_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('30000'),
   DB_POOL_CONNECTION_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('10000'),
   
   // LLM Configuration
   OPENAI_API_KEY: z.string().optional(),
-  OPENAI_API_BASE_URL: z.string().url().optional(),
+  OPENAI_API_BASE_URL: z.string().url().or(z.literal('')).optional(),
   OPENAI_MODEL: z.string().optional(),
   OPENAI_TEMPERATURE: z.string().regex(/^\d+\.?\d*$/).transform(Number).optional(),
   
   ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_API_BASE_URL: z.string().url().optional(),
+  ANTHROPIC_API_BASE_URL: z.string().url().or(z.literal('')).optional(),
   ANTHROPIC_MODEL: z.string().optional(),
   
-  // Self-Hosted LLM (Ollama)
-  OLLAMA_BASE_URL: z.string().url().optional(),
+  // Self-Hosted LLM (Ollama) - Support both LLM_BASE_URL (jira-feature-documentor pattern) and OLLAMA_BASE_URL
+  LLM_BASE_URL: z.string().optional(),
+  LLM_MODEL: z.string().optional(),
+  OLLAMA_BASE_URL: z.string().optional(),
   OLLAMA_MODEL: z.string().optional(),
   OLLAMA_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   // Web Search APIs
   BRAVE_SEARCH_API_KEY: z.string().optional(),
-  BRAVE_SEARCH_API_URL: z.string().url().optional(),
+  BRAVE_SEARCH_API_URL: z.string().url().or(z.literal('')).optional(),
   BRAVE_SEARCH_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   SERP_API_KEY: z.string().optional(),
-  SERP_API_URL: z.string().url().optional(),
+  SERP_API_URL: z.string().url().or(z.literal('')).optional(),
   SERP_API_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   GOOGLE_SEARCH_API_KEY: z.string().optional(),
   GOOGLE_SEARCH_ENGINE_ID: z.string().optional(),
-  GOOGLE_SEARCH_API_URL: z.string().url().optional(),
+  GOOGLE_SEARCH_API_URL: z.string().url().or(z.literal('')).optional(),
   GOOGLE_SEARCH_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   // Self-Hosted Web Search (SearxNG)
-  SEARXNG_URL: z.string().url().optional(),
+  SEARXNG_URL: z.string().url().or(z.literal('')).optional(),
   SEARXNG_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).optional(),
   
   // Vector Database (Optional - for RAG)
   PINECONE_API_KEY: z.string().optional(),
   PINECONE_ENVIRONMENT: z.string().optional(),
   PINECONE_INDEX_NAME: z.string().optional(),
-  PINECONE_API_URL: z.string().url().optional(),
+  PINECONE_API_URL: z.string().url().or(z.literal('')).optional(),
   
   // AWS Configuration
   AWS_REGION: z.string().default('us-east-1'),
@@ -108,8 +110,23 @@ export const config = {
       model: () => getEnvConfig().ANTHROPIC_MODEL || 'claude-3-sonnet-20240229',
     },
     ollama: {
-      baseUrl: () => getEnvConfig().OLLAMA_BASE_URL || 'http://localhost:11434',
-      model: () => getEnvConfig().OLLAMA_MODEL || 'llama2:7b',
+      // Support both LLM_BASE_URL (jira-feature-documentor pattern) and OLLAMA_BASE_URL (legacy)
+      // Only use default if neither is provided, and validate URL if provided
+      baseUrl: () => {
+        const url = getEnvConfig().LLM_BASE_URL || getEnvConfig().OLLAMA_BASE_URL || 'http://localhost:11434';
+        // Validate URL format if not empty
+        if (url && url !== 'http://localhost:11434') {
+          try {
+            new URL(url);
+          } catch {
+            console.warn(`Invalid LLM_BASE_URL/OLLAMA_BASE_URL: ${url}, using default`);
+            return 'http://localhost:11434';
+          }
+        }
+        return url;
+      },
+      // Support both LLM_MODEL (jira-feature-documentor pattern) and OLLAMA_MODEL (legacy)
+      model: () => getEnvConfig().LLM_MODEL || getEnvConfig().OLLAMA_MODEL || 'llama3.2:3b',
       timeout: () => getEnvConfig().OLLAMA_TIMEOUT ?? 30000,
     },
   },

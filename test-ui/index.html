@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Search 2.0 - Chat UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .message-user { @apply bg-blue-500 text-white rounded-lg px-4 py-2 max-w-3xl ml-auto; }
+        .message-assistant { @apply bg-white text-gray-800 border border-gray-200 rounded-lg px-4 py-2 max-w-3xl; }
+        .loading { @apply flex space-x-1; }
+        .loading div { @apply w-2 h-2 bg-gray-400 rounded-full animate-bounce; }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 px-4 py-3">
+        <div class="flex items-center justify-between">
+            <h1 class="text-xl font-semibold text-gray-800">AI Search 2.0 Chat</h1>
+            <button onclick="clearChat()" class="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50">
+                Clear Chat
+            </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-1" id="status">
+            API: <span id="api-url">http://localhost:4000</span> | Conversation: <span id="conv-id">New</span>
+        </p>
+    </header>
+
+    <!-- Messages -->
+    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4" id="messages">
+        <div class="text-center text-gray-500 mt-8">
+            <p class="text-lg mb-2">👋 Welcome to AI Search 2.0</p>
+            <p class="text-sm">Ask me about tickets, events, prices, or locations!</p>
+            <p class="text-xs mt-4 text-gray-400">Example: "Find tickets for Taylor Swift in New York"</p>
+        </div>
+    </div>
+
+    <!-- Input -->
+    <div class="bg-white border-t border-gray-200 px-4 py-3">
+        <div class="flex space-x-2">
+            <input
+                type="text"
+                id="message-input"
+                placeholder="Ask about tickets, events, prices..."
+                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onkeypress="if(event.key==='Enter' && !event.shiftKey) sendMessage()"
+            />
+            <button
+                onclick="sendMessage()"
+                id="send-btn"
+                class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                Send
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:4000';
+        let conversationId = null;
+        let loading = false;
+
+        function addMessage(role, content, sources) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const messageContent = document.createElement('div');
+            messageContent.className = role === 'user' ? 'message-user' : 'message-assistant';
+            messageContent.innerHTML = `<p class="whitespace-pre-wrap">${escapeHtml(content)}</p>`;
+            
+            if (sources) {
+                const sourcesDiv = document.createElement('div');
+                sourcesDiv.className = 'mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500';
+                if (sources.db_results) {
+                    sourcesDiv.innerHTML += `<p>📊 DB Results: ${sources.db_results.length} items</p>`;
+                }
+                if (sources.web_results) {
+                    sourcesDiv.innerHTML += `<p>🌐 Web Results: ${sources.web_results.length} items</p>`;
+                }
+                messageContent.appendChild(sourcesDiv);
+            }
+            
+            messageDiv.appendChild(messageContent);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addLoading() {
+            const messagesDiv = document.getElementById('messages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'flex justify-start';
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.innerHTML = `
+                <div class="bg-white border border-gray-200 rounded-lg px-4 py-2">
+                    <div class="loading">
+                        <div></div>
+                        <div style="animation-delay: 0.1s"></div>
+                        <div style="animation-delay: 0.2s"></div>
+                    </div>
+                </div>
+            `;
+            messagesDiv.appendChild(loadingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function removeLoading() {
+            const loading = document.getElementById('loading-indicator');
+            if (loading) loading.remove();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            if (!message || loading) return;
+
+            addMessage('user', message);
+            input.value = '';
+            loading = true;
+            document.getElementById('send-btn').disabled = true;
+            addLoading();
+
+            try {
+                const response = await fetch(`${API_URL}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message,
+                        conversation_id: conversationId,
+                        include_web_search: true,
+                        include_db_search: true
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                conversationId = data.conversation_id;
+                document.getElementById('conv-id').textContent = conversationId ? conversationId.substring(0, 20) + '...' : 'New';
+                
+                removeLoading();
+                addMessage('assistant', data.message, data.sources);
+            } catch (error) {
+                removeLoading();
+                addMessage('assistant', `Error: ${error.message}. Make sure serverless offline is running on ${API_URL}`);
+                console.error('Error:', error);
+            } finally {
+                loading = false;
+                document.getElementById('send-btn').disabled = false;
+            }
+        }
+
+        function clearChat() {
+            document.getElementById('messages').innerHTML = `
+                <div class="text-center text-gray-500 mt-8">
+                    <p class="text-lg mb-2">👋 Welcome to AI Search 2.0</p>
+                    <p class="text-sm">Ask me about tickets, events, prices, or locations!</p>
+                </div>
+            `;
+            conversationId = null;
+            document.getElementById('conv-id').textContent = 'New';
+            if (conversationId) {
+                fetch(`${API_URL}/api/chat/history/${conversationId}`, { method: 'DELETE' }).catch(console.error);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
+

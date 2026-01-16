@@ -1,0 +1,45 @@
+service: ai-search-test-ui
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  httpApi:
+    cors: true
+
+functions:
+  ui:
+    handler: handler-simple.handler
+    timeout: 30
+    memorySize: 512
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+      - httpApi:
+          path: /
+          method: GET
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 5001  # UI port
+    lambdaPort: 5002  # Lambda port for UI
+    noPrependStageInUrl: true
+    host: 0.0.0.0
+
+package:
+  patterns:
+    - 'handler-simple.js'
+    - 'public/**'
+    - 'package.json'
+    - 'node_modules/express/**'
+    - 'node_modules/serverless-http/**'
+    - '!node_modules/**/*.md'
+    - '!node_modules/**/*.txt'
+

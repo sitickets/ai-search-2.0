@@ -1,0 +1,54 @@
+# Copy this to terraform.tfvars and update with your values
+# AI Search 2.0 - Optimized for structured queries, conversation, and web search
+
+aws_region  = "us-east-1"
+aws_profile = "sitix-INT"  # Your AWS profile name
+
+project_name = "ai-search-2-0-ollama"
+environment  = "dev"
+
+# Instance configuration
+# Recommended: g4dn.xlarge (GPU, ~$0.50/hour) for 8B models
+# Alternative: g5.xlarge (better GPU, ~$1.00/hour) for faster inference
+# Budget option: t3.xlarge (CPU-only, ~$0.17/hour) - slower but works
+instance_type = "g4dn.xlarge"  # GPU instance with NVIDIA T4 (16GB VRAM)
+volume_size   = 50  # 8B models need ~20GB, 50GB is safe
+
+# Model configuration
+# Recommended: llama3.1:8b-instruct (best for structured queries + conversation)
+# Alternative: qwen2.5:7b-instruct (excellent at structured JSON extraction)
+ollama_model  = "llama3.1:8b-instruct"
+
+# Network configuration
+use_default_vpc = true
+# vpc_id = ""  # Only if not using default VPC
+
+# Security - For Lambda Access (REQUIRED for Lambda to access Ollama)
+# 
+# IMPORTANT: Lambda must be in VPC to access EC2. Two-step process:
+# 1. Deploy Ollama first (leave lambda_security_group_id empty)
+# 2. Deploy Lambda and get its security group ID
+# 3. Update this file with Lambda's security group ID
+# 4. Run terraform apply again
+#
+# Option 1: Use Lambda Security Group ID (RECOMMENDED - More Secure)
+# lambda_security_group_id = "sg-0123456789abcdef0"  # Get from Lambda function's VPC config
+
+# Option 2: Allow entire VPC CIDR (Simpler but Less Secure - allows all VPC resources)
+# allow_vpc_cidr = true  # Allows all resources in VPC to access Ollama
+
+# Security - For Development/Testing (optional)
+# Add your office IP for local testing
+allowed_cidr_blocks = [
+  # "1.2.3.4/32",        # Your office IP (uncomment and add)
+]
+
+# [DEPRECATED] Lambda VPC CIDR (use lambda_security_group_id instead)
+# lambda_vpc_cidr = "10.0.0.0/16"
+
+# SSH Access (optional - for direct SSH)
+# enable_public_ip = false  # Set to true to enable public IP (less secure)
+# enable_ssh_access = false  # Set to true to open port 22 in security group
+# ssh_allowed_cidr_blocks = [
+#   # "1.2.3.4/32",  # Your IP for SSH access
+# ]
