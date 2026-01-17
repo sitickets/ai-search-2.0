@@ -48,6 +48,8 @@ export class EnhancedSearchService {
     venue?: string;
     priceMin?: number;
     priceMax?: number;
+    dateFrom?: string;
+    dateTo?: string;
     includeWebContext?: boolean;
   }): Promise<EnhancedTicketResult[]> {
     // Get tickets from database
@@ -111,6 +113,8 @@ export class EnhancedSearchService {
     performer?: string;
     eventType?: string;
     location?: string;
+    dateFrom?: string;
+    dateTo?: string;
     includeWebContext?: boolean;
   }): Promise<EnhancedEventResult[]> {
     // Get events from database
@@ -194,16 +198,23 @@ export class EnhancedSearchService {
     const priceMin = priceMatch ? parseInt(priceMatch[1]) : undefined;
     const priceMax = priceMatch && priceMatch[2] ? parseInt(priceMatch[2]) : undefined;
 
+    // Extract date range from natural language
+    const { dateFrom, dateTo } = this.extractDateRange(lowerQuery);
+
     // Search both tickets and events
     const [tickets, events] = await Promise.all([
       this.searchTicketsWithContext({
         performer,
         priceMin,
         priceMax,
+        dateFrom,
+        dateTo,
         includeWebContext: true
       }),
       this.searchEventsWithContext({
         performer,
+        dateFrom,
+        dateTo,
         includeWebContext: true
       })
     ]);
@@ -221,6 +232,104 @@ export class EnhancedSearchService {
         webResults
       }
     };
+  }
+
+  /**
+   * Extract date range from natural language queries
+   */
+  private extractDateRange(query: string): { dateFrom?: string; dateTo?: string } {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // "this weekend"
+    if (query.includes('this weekend') || query.includes('this week end')) {
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+      const daysUntilSaturday = (6 - dayOfWeek + 7) % 7 || 7;
+      const saturday = new Date(today);
+      saturday.setDate(today.getDate() + daysUntilSaturday);
+      const sunday = new Date(saturday);
+      sunday.setDate(saturday.getDate() + 1);
+      
+      return {
+        dateFrom: saturday.toISOString().split('T')[0],
+        dateTo: sunday.toISOString().split('T')[0]
+      };
+    }
+    
+    // "this week"
+    if (query.includes('this week')) {
+      const dayOfWeek = today.getDay();
+      const daysUntilSunday = (7 - dayOfWeek) % 7 || 7;
+      const endOfWeek = new Date(today);
+      endOfWeek.setDate(today.getDate() + daysUntilSunday);
+      
+      return {
+        dateFrom: today.toISOString().split('T')[0],
+        dateTo: endOfWeek.toISOString().split('T')[0]
+      };
+    }
+    
+    // "next weekend"
+    if (query.includes('next weekend')) {
+      const dayOfWeek = today.getDay();
+      const daysUntilNextSaturday = (6 - dayOfWeek + 7) % 7 + 7;
+      const nextSaturday = new Date(today);
+      nextSaturday.setDate(today.getDate() + daysUntilNextSaturday);
+      const nextSunday = new Date(nextSaturday);
+      nextSunday.setDate(nextSaturday.getDate() + 1);
+      
+      return {
+        dateFrom: nextSaturday.toISOString().split('T')[0],
+        dateTo: nextSunday.toISOString().split('T')[0]
+      };
+    }
+    
+    // "this month"
+    if (query.includes('this month')) {
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return {
+        dateFrom: today.toISOString().split('T')[0],
+        dateTo: endOfMonth.toISOString().split('T')[0]
+      };
+    }
+    
+    // "next month"
+    if (query.includes('next month')) {
+      const startOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const endOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      return {
+        dateFrom: startOfNextMonth.toISOString().split('T')[0],
+        dateTo: endOfNextMonth.toISOString().split('T')[0]
+      };
+    }
+    
+    // Specific month names (e.g., "in February", "in Feb")
+    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
+                        'july', 'august', 'september', 'october', 'november', 'december'];
+    const monthAbbr = ['jan', 'feb', 'mar', 'apr', 'may', 'jun',
+                       'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    
+    for (let i = 0; i < monthNames.length; i++) {
+      if (query.includes(monthNames[i]) || query.includes(monthAbbr[i])) {
+        const year = today.getFullYear();
+        const month = i; // 0-indexed
+        const startOfMonth = new Date(year, month, 1);
+        const endOfMonth = new Date(year, month + 1, 0);
+        
+        // If the month has passed this year, use next year
+        if (startOfMonth < today) {
+          startOfMonth.setFullYear(year + 1);
+          endOfMonth.setFullYear(year + 1);
+        }
+        
+        return {
+          dateFrom: startOfMonth.toISOString().split('T')[0],
+          dateTo: endOfMonth.toISOString().split('T')[0]
+        };
+      }
+    }
+    
+    return {};
   }
 }
 

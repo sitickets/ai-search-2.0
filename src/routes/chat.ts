@@ -13,7 +13,17 @@ const router = Router();
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { message, conversation_id, messages, include_web_search, include_db_search } = req.body;
+    const { 
+      message, 
+      conversation_id, 
+      messages, 
+      include_web_search, 
+      include_db_search,
+      user_location,
+      user_city,
+      user_state,
+      user_country
+    } = req.body;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({
@@ -26,7 +36,11 @@ router.post('/', async (req: Request, res: Response) => {
       conversation_id,
       messages,
       include_web_search: include_web_search !== false, // Default true
-      include_db_search: include_db_search !== false    // Default true
+      include_db_search: include_db_search !== false,    // Default true
+      user_location,
+      user_city,
+      user_state,
+      user_country
     };
 
     const response = await chatService.processChat(chatRequest);

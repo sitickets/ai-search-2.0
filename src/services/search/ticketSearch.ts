@@ -93,9 +93,24 @@ export async function searchTickets(params: TicketSearchParams): Promise<TicketR
   }
 
   if (location) {
-    sql += ` AND (v.city ILIKE $${paramIndex} OR v.state ILIKE $${paramIndex} OR v.name ILIKE $${paramIndex})`;
-    queryParams.push(`%${location}%`);
-    paramIndex++;
+    // Handle location with multiple terms (e.g., "Westchester County|Westchester")
+    const locationTerms = location.split('|');
+    if (locationTerms.length > 1) {
+      // Search for any of the terms
+      sql += ` AND (`;
+      locationTerms.forEach((term, idx) => {
+        if (idx > 0) sql += ` OR `;
+        sql += `(v.city ILIKE $${paramIndex} OR v.state ILIKE $${paramIndex} OR v.name ILIKE $${paramIndex} OR v.county ILIKE $${paramIndex})`;
+        queryParams.push(`%${term.trim()}%`);
+      });
+      sql += `)`;
+      paramIndex += locationTerms.length;
+    } else {
+      // Single location term - also check county field if it exists
+      sql += ` AND (v.city ILIKE $${paramIndex} OR v.state ILIKE $${paramIndex} OR v.name ILIKE $${paramIndex} OR v.county ILIKE $${paramIndex})`;
+      queryParams.push(`%${location}%`);
+      paramIndex++;
+    }
   }
 
   if (priceMin !== undefined) {

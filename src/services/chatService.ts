@@ -19,6 +19,10 @@ export interface ChatRequest {
   messages?: ChatMessage[]; // Conversation history
   include_web_search?: boolean;
   include_db_search?: boolean;
+  user_location?: string; // User's location from browser locale
+  user_city?: string;
+  user_state?: string;
+  user_country?: string;
 }
 
 export interface ChatResponse {
@@ -27,6 +31,7 @@ export interface ChatResponse {
   sources?: {
     db_results?: any[];
     web_results?: any[];
+    ticket_links?: Array<{event_name: string, link: string, event_id: number}>;
   };
   metadata?: {
     query_type?: string;
@@ -55,7 +60,17 @@ export class ChatService {
    * Process chat message with context from DB and web
    */
   async processChat(request: ChatRequest): Promise<ChatResponse> {
-    const { message, conversation_id, messages, include_web_search = true, include_db_search = true } = request;
+    const { 
+      message, 
+      conversation_id, 
+      messages, 
+      include_web_search = true, 
+      include_db_search = true,
+      user_location,
+      user_city,
+      user_state,
+      user_country
+    } = request;
 
     // Generate or use conversation ID
     const convId = conversation_id || this.generateConversationId();
@@ -76,11 +91,25 @@ export class ChatService {
 
     if (include_db_search) {
       try {
-        const dbSearch = await enhancedSearchService.comprehensiveSearch(message);
+        // Enhance search with user location if available
+        let searchQuery = message;
+        if (user_location || user_city || user_state) {
+          const locationParts = [user_city, user_state, user_country].filter(Boolean);
+          if (locationParts.length > 0) {
+            searchQuery = `${message} ${locationParts.join(', ')}`;
+          }
+        }
+        
+        const dbSearch = await enhancedSearchService.comprehensiveSearch(searchQuery);
         dbResults = [
-          ...(dbSearch.tickets || []).slice(0, 5),
-          ...(dbSearch.events || []).slice(0, 5)
+          ...(dbSearch.tickets || []).slice(0, 10), // Get more results for better selection
+          ...(dbSearch.events || []).slice(0, 10)
         ];
+        
+        // If user location provided, prioritize nearby results
+        if (user_city || user_state) {
+          dbResults = this.prioritizeByLocation(dbResults, user_city, user_state);
+        }
       } catch (error) {
         console.error('DB search error:', error);
       }
@@ -98,10 +127,10 @@ export class ChatService {
     }
 
     // Build context for LLM
-    const context = this.buildContext(dbResults, webResults);
+    const context = this.buildContext(dbResults, webResults, user_location, user_city, user_state);
 
     // Generate response using Ollama
-    const assistantMessage = await this.generateResponse(conversationHistory, context);
+    const assistantMessage = await this.generateResponse(conversationHistory, context, dbResults);
 
     // Add assistant response to history
     conversationHistory.push({
@@ -113,12 +142,30 @@ export class ChatService {
     // Store conversation
     conversationStore.set(convId, conversationHistory);
 
+    // Extract ticket links from dbResults and ensure they're in the response
+    const ticketLinks: Array<{event_name: string, link: string, event_id: number}> = [];
+    if (dbResults.length > 0) {
+      const seenEvents = new Set<number>();
+      dbResults.forEach(ticket => {
+        const eventId = ticket.event_id || ticket.ticket_id;
+        if (eventId && !seenEvents.has(eventId)) {
+          seenEvents.add(eventId);
+          ticketLinks.push({
+            event_name: ticket.event_name || ticket.title || 'Event',
+            link: `https://sitickets.com/event/${eventId}`,
+            event_id: eventId
+          });
+        }
+      });
+    }
+
     return {
       message: assistantMessage,
       conversation_id: convId,
       sources: {
         db_results: dbResults.length > 0 ? dbResults : undefined,
-        web_results: webResults.length > 0 ? webResults : undefined
+        web_results: webResults.length > 0 ? webResults : undefined,
+        ticket_links: ticketLinks.length > 0 ? ticketLinks : undefined // Explicit ticket links
       },
       metadata: {
         query_type: this.detectQueryType(message),
@@ -130,20 +177,41 @@ export class ChatService {
   /**
    * Generate response using Ollama
    */
-  private async generateResponse(history: ChatMessage[], context: string): Promise<string> {
-    // Build system prompt
-    const systemPrompt = `You are a helpful assistant for a ticket marketplace. You help users find tickets, events, and information.
+  private async generateResponse(history: ChatMessage[], context: string, dbResults: any[]): Promise<string> {
+    // Build system prompt with strict instructions
+    const systemPrompt = `You are a helpful ticket marketplace assistant. Your job is to help users find and purchase tickets.
 
-You have access to:
-1. Database search results (tickets and events)
-2. Web search results (for additional context)
+CRITICAL INSTRUCTIONS:
+1. ALWAYS include actual ticket information in your FIRST response if tickets are available
+2. ALWAYS mention the price range (e.g., "Prices range from $50 to $200")
+3. ALWAYS include specific ticket details: event name, venue, date, and price
+4. ALWAYS include the ticket link for EACH event you mention - format as: [Event Name](Ticket Link URL)
+5. If multiple options exist, present 2-3 best options with clear details
+6. Be direct and helpful - don't ask for more info if you already have ticket data
+7. Use web search results only for additional context (artist bio, venue info)
+8. Format all information clearly with line breaks
 
-When answering:
-- Use the database results to provide specific ticket/event information
-- Use web search results to provide additional context (artist info, venue details, etc.)
-- Be conversational and helpful
-- If no results found, suggest alternative searches
-- Format ticket prices, dates, and locations clearly
+When tickets are available:
+- Start with: "Great! I found tickets for [artist/event]"
+- For EACH event, list: Event name, Venue, Date, Price range, AND the ticket link
+- Format links as markdown: [Event Name](https://sitickets.com/event/EVENT_ID)
+- If unsure between options, present 2-3 choices clearly with links for each
+- CRITICAL: Only mention events that match the date criteria in the user's query
+- If user asks for "this weekend", ONLY show events happening on Saturday or Sunday of this week
+- If user asks for a specific date range, ONLY show events within that range
+- If no events match the date criteria, say "I didn't find any events for [date range]" and suggest alternative dates
+- Always end with a call to action
+
+When no tickets found:
+- DO NOT suggest external websites like Eventbrite, Songkick, or other ticket sites
+- Only suggest searching within our own database with different criteria
+- Ask clarifying questions about location, date, or artist
+- If location not found, try broader location terms (e.g., if "Westchester County" not found, try "Westchester" or nearby cities)
+
+IMPORTANT: 
+- Every event you mention MUST have a ticket link in the format [Event Name](Ticket Link URL)
+- ONLY use ticket links from the context provided - do not make up event IDs
+- If no ticket link is provided in context, say "tickets available" but don't create fake links
 
 Context from searches:
 ${context}
@@ -187,33 +255,110 @@ ${history.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}`;
   }
 
   /**
-   * Build context string from search results
+   * Build context string from search results with price ranges and ticket links
    */
-  private buildContext(dbResults: any[], webResults: any[]): string {
+  private buildContext(dbResults: any[], webResults: any[], userLocation?: string, userCity?: string, userState?: string): string {
     let context = '';
 
     if (dbResults.length > 0) {
-      context += '\n=== Database Results ===\n';
-      dbResults.slice(0, 5).forEach((result, idx) => {
-        if (result.event_name) {
-          context += `${idx + 1}. Event: ${result.event_name}\n`;
-          if (result.venue_name) context += `   Venue: ${result.venue_name}\n`;
-          if (result.event_date) context += `   Date: ${result.event_date}\n`;
-          if (result.price) context += `   Price: $${result.price}\n`;
+      context += '\n=== AVAILABLE TICKETS ===\n';
+      
+      // Group by event to show price ranges
+      const eventGroups = new Map<string, any[]>();
+      dbResults.forEach((result) => {
+        const eventKey = result.event_name || result.title || 'Unknown Event';
+        if (!eventGroups.has(eventKey)) {
+          eventGroups.set(eventKey, []);
         }
+        eventGroups.get(eventKey)!.push(result);
       });
+
+      let idx = 1;
+      for (const [eventName, tickets] of Array.from(eventGroups.entries()).slice(0, 5)) {
+        const prices = tickets.map(t => t.price).filter(Boolean);
+        const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+        const maxPrice = prices.length > 0 ? Math.max(...prices) : null;
+        const firstTicket = tickets[0];
+        
+        context += `\n${idx}. ${eventName}\n`;
+        if (firstTicket.venue || firstTicket.venue_name) {
+          context += `   Venue: ${firstTicket.venue || firstTicket.venue_name}\n`;
+        }
+        if (firstTicket.city && firstTicket.state) {
+          context += `   Location: ${firstTicket.city}, ${firstTicket.state}\n`;
+        } else if (firstTicket.city) {
+          context += `   Location: ${firstTicket.city}\n`;
+        }
+        if (firstTicket.event_date) {
+          const date = new Date(firstTicket.event_date);
+          const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          context += `   Date: ${dateStr} (${date.toISOString().split('T')[0]})\n`;
+        }
+        if (minPrice !== null && maxPrice !== null) {
+          if (minPrice === maxPrice) {
+            context += `   Price: $${minPrice.toFixed(2)}\n`;
+          } else {
+            context += `   Price Range: $${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}\n`;
+          }
+        } else if (minPrice !== null) {
+          context += `   Starting at: $${minPrice.toFixed(2)}\n`;
+        }
+        
+        // Generate ticket link - CRITICAL: Always include this
+        const eventId = firstTicket.event_id || firstTicket.ticket_id;
+        if (eventId) {
+          const ticketLink = `https://sitickets.com/event/${eventId}`;
+          context += `   Ticket Link: ${ticketLink}\n`;
+          context += `   REQUIRED: You MUST include this link in your response as: [${eventName}](${ticketLink})\n`;
+        }
+        
+        if (tickets.length > 1) {
+          context += `   (${tickets.length} ticket options available)\n`;
+        }
+        idx++;
+      }
+      
+      if (userCity || userState) {
+        context += `\nNOTE: User is located in ${[userCity, userState].filter(Boolean).join(', ') || userLocation || 'their location'}. Prioritize nearby events.\n`;
+      }
     }
 
     if (webResults.length > 0) {
-      context += '\n=== Web Search Results ===\n';
-      webResults.slice(0, 5).forEach((result, idx) => {
+      context += '\n=== Additional Context (Web Search) ===\n';
+      webResults.slice(0, 3).forEach((result, idx) => {
         context += `${idx + 1}. ${result.title || 'Result'}\n`;
         if (result.snippet) context += `   ${result.snippet.substring(0, 150)}...\n`;
-        if (result.url) context += `   Source: ${result.url}\n`;
       });
     }
 
     return context || 'No search results available.';
+  }
+
+  /**
+   * Prioritize results by user location
+   */
+  private prioritizeByLocation(results: any[], userCity?: string, userState?: string): any[] {
+    if (!userCity && !userState) return results;
+    
+    const locationResults: any[] = [];
+    const otherResults: any[] = [];
+    
+    const cityLower = userCity?.toLowerCase() || '';
+    const stateLower = userState?.toLowerCase() || '';
+    
+    results.forEach(result => {
+      const resultCity = result.city?.toLowerCase() || '';
+      const resultState = result.state?.toLowerCase() || '';
+      
+      if ((cityLower && resultCity.includes(cityLower)) || 
+          (stateLower && resultState.includes(stateLower))) {
+        locationResults.push(result);
+      } else {
+        otherResults.push(result);
+      }
+    });
+    
+    return [...locationResults, ...otherResults];
   }
 
   /**

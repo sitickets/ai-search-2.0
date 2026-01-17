@@ -128,7 +128,11 @@
                         message,
                         conversation_id: conversationId,
                         include_web_search: true,
-                        include_db_search: true
+                        include_db_search: true,
+                        user_location: userLocation.location,
+                        user_city: userLocation.city,
+                        user_state: userLocation.state,
+                        user_country: userLocation.country
                     })
                 });
 
@@ -141,7 +145,42 @@
                 document.getElementById('conv-id').textContent = conversationId ? conversationId.substring(0, 20) + '...' : 'New';
                 
                 removeLoading();
-                addMessage('assistant', data.message, data.sources);
+                
+                // Format message with ticket links - use innerHTML to render links
+                let formattedMessage = formatMessageWithTickets(data.message, data.sources?.db_results || []);
+                
+                // Use innerHTML to render links properly
+                const messagesDiv = document.getElementById('messages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'flex justify-start';
+                
+                const messageContent = document.createElement('div');
+                messageContent.className = 'message-assistant';
+                messageContent.innerHTML = `<p class="whitespace-pre-wrap">${formattedMessage}</p>`;
+                
+                if (data.sources) {
+                    const sourcesDiv = document.createElement('div');
+                    sourcesDiv.className = 'mt-2 pt-2 border-t border-gray-200 text-xs text-gray-500';
+                    if (data.sources.db_results && data.sources.db_results.length > 0) {
+                        sourcesDiv.innerHTML += `<p>📊 Found ${data.sources.db_results.length} ticket options</p>`;
+                        // Add clickable ticket links
+                        data.sources.db_results.slice(0, 5).forEach(ticket => {
+                            if (ticket.event_id) {
+                                const link = `https://sitickets.com/event/${ticket.event_id}`;
+                                const eventName = ticket.event_name || 'View Tickets';
+                                sourcesDiv.innerHTML += `<p class="mt-1"><a href="${link}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">🎫 ${eventName}</a></p>`;
+                            }
+                        });
+                    }
+                    if (data.sources.web_results && data.sources.web_results.length > 0) {
+                        sourcesDiv.innerHTML += `<p>🌐 Web context included</p>`;
+                    }
+                    messageContent.appendChild(sourcesDiv);
+                }
+                
+                messageDiv.appendChild(messageContent);
+                messagesDiv.appendChild(messageDiv);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
             } catch (error) {
                 removeLoading();
                 addMessage('assistant', `Error: ${error.message}. Make sure serverless offline is running on ${API_URL}`);
@@ -170,6 +209,76 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+        
+        function formatMessageWithTickets(message, dbResults) {
+            // First, convert markdown-style links to HTML (do this before escaping)
+            let formatted = message;
+            
+            // Convert markdown links [text](url) to HTML links - capture full URL including sitickets.com
+            formatted = formatted.replace(
+                /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+                (match, text, url) => {
+                    // Only create links for sitickets.com URLs
+                    if (url.includes('sitickets.com')) {
+                        return `<a href="${url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline font-semibold" style="text-decoration: underline;">${text} →</a>`;
+                    }
+                    return text; // Don't link non-sitickets URLs
+                }
+            );
+            
+            // Now we need to preserve the links while escaping the rest
+            // Extract links first
+            const linkPlaceholder = '___LINK_PLACEHOLDER___';
+            const links = [];
+            let linkIndex = 0;
+            
+            // Extract and replace links with placeholders
+            formatted = formatted.replace(
+                /<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g,
+                (match, url, text) => {
+                    links.push({ url, text });
+                    return linkPlaceholder + (linkIndex++) + linkPlaceholder;
+                }
+            );
+            
+            // Escape the rest of the HTML
+            formatted = escapeHtml(formatted);
+            
+            // Restore the links
+            links.forEach((link, idx) => {
+                formatted = formatted.replace(
+                    linkPlaceholder + idx + linkPlaceholder,
+                    `<a href="${link.url}" target="_blank" class="text-blue-600 hover:text-blue-800 underline font-semibold" style="text-decoration: underline;">${link.text}</a>`
+                );
+            });
+            
+            // If no markdown links found, try to add links from dbResults
+            if (!formatted.includes('href=') && dbResults && dbResults.length > 0) {
+                const seenEvents = new Set();
+                dbResults.forEach((ticket, idx) => {
+                    if (ticket.event_id && typeof ticket.event_id === 'number' && !seenEvents.has(ticket.event_id)) {
+                        seenEvents.add(ticket.event_id);
+                        const link = `https://sitickets.com/event/${ticket.event_id}`;
+                        const eventName = ticket.event_name || ticket.title || `Event ${idx + 1}`;
+                        // Try to find the event name in the message and make it a link
+                        const escapedName = escapeRegex(eventName);
+                        formatted = formatted.replace(
+                            new RegExp(`\\b(${escapedName})\\b`, 'gi'),
+                            `<a href="${link}" target="_blank" class="text-blue-600 hover:text-blue-800 underline font-semibold" style="text-decoration: underline;">$1 →</a>`
+                        );
+                    }
+                });
+            }
+            
+            // Convert newlines to <br>
+            formatted = formatted.replace(/\n/g, '<br>');
+            
+            return formatted;
+        }
+        
+        function escapeRegex(str) {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
     </script>
 </body>
