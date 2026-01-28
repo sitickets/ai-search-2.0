@@ -17,6 +17,11 @@ const envSchema = z.object({
   DB_POOL_MAX: z.string().regex(/^\d+$/).transform(Number).default('20'),
   DB_POOL_IDLE_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('30000'),
   DB_POOL_CONNECTION_TIMEOUT: z.string().regex(/^\d+$/).transform(Number).default('10000'),
+  DB_QUERY_TIMEOUT_MS: z.string().regex(/^\d+$/).transform(Number).optional(), // Query timeout in milliseconds
+  DB_MAX_RESULT_ROWS: z.string().regex(/^\d+$/).transform(Number).optional(), // Maximum rows to return
+  DB_MAX_QUERY_LENGTH: z.string().regex(/^\d+$/).transform(Number).optional(), // Maximum query string length
+  DB_ENABLE_COMPLEXITY_CHECK: z.string().optional(), // Enable query complexity checks
+  DB_ENABLE_STATEMENT_TIMEOUT: z.string().optional(), // Enable PostgreSQL statement_timeout
   
   // LLM Configuration
   OPENAI_API_KEY: z.string().optional(),

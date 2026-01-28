@@ -50,34 +50,35 @@ export async function searchEvents(params: EventSearchParams): Promise<EventResu
   let sql = `
     SELECT DISTINCT
       me.id as event_id,
-      me.title,
-      me.event_date,
-      me.event_type,
-      me.popularity_score,
+      me.name as title,
+      me.occurs_at as event_date,
+      me.tevo_popularity_score as popularity_score,
       v.name as venue,
       v.city,
       v.state,
-      MIN(mtg.price) as min_price,
-      MAX(mtg.price) as max_price,
-      SUM(mtg.quantity_available) as total_tickets_available
+      MIN(mtg.retail_price) as min_price,
+      MAX(mtg.retail_price) as max_price,
+      SUM(mtg.current_quantity) as total_tickets_available
     FROM public.master_events me
-    LEFT JOIN public.venues v ON me.venue_id = v.id
-    LEFT JOIN public.master_ticketing_groups mtg ON me.id = mtg.event_id AND mtg.quantity_available > 0
+    LEFT JOIN public.master_venues v ON me.master_venue_id = v.id
+    LEFT JOIN public.master_ticketing_groups mtg ON me.id = mtg.event_id AND mtg.current_quantity > 0
     WHERE 1=1
+    AND me.occurs_at >= CURRENT_DATE
   `;
 
   const queryParams: any[] = [];
   let paramIndex = 1;
 
   if (performer) {
-    sql += ` AND me.title ILIKE $${paramIndex++}`;
+    sql += ` AND me.name ILIKE $${paramIndex++}`;
     queryParams.push(`%${performer}%`);
   }
 
-  if (eventType) {
-    sql += ` AND me.event_type ILIKE $${paramIndex++}`;
-    queryParams.push(`%${eventType}%`);
-  }
+  // Note: event_type column doesn't exist in master_events
+  // if (eventType) {
+  //   sql += ` AND me.event_type ILIKE $${paramIndex++}`;
+  //   queryParams.push(`%${eventType}%`);
+  // }
 
   if (location) {
     sql += ` AND (v.city ILIKE $${paramIndex} OR v.state ILIKE $${paramIndex} OR v.name ILIKE $${paramIndex})`;
@@ -101,23 +102,23 @@ export async function searchEvents(params: EventSearchParams): Promise<EventResu
   }
 
   if (dateFrom) {
-    sql += ` AND me.event_date >= $${paramIndex++}`;
+    sql += ` AND me.occurs_at >= $${paramIndex++}`;
     queryParams.push(dateFrom);
   }
 
   if (dateTo) {
-    sql += ` AND me.event_date <= $${paramIndex++}`;
+    sql += ` AND me.occurs_at <= $${paramIndex++}`;
     queryParams.push(dateTo);
   }
 
   if (popularityMin !== undefined) {
-    sql += ` AND me.popularity_score >= $${paramIndex++}`;
+    sql += ` AND me.tevo_popularity_score >= $${paramIndex++}`;
     queryParams.push(popularityMin);
   }
 
-  sql += ` GROUP BY me.id, me.title, me.event_date, me.event_type, me.popularity_score, v.name, v.city, v.state`;
-  sql += ` HAVING SUM(mtg.quantity_available) > 0 OR COUNT(mtg.id) = 0`;
-  sql += ` ORDER BY me.popularity_score DESC NULLS LAST, me.event_date ASC`;
+  sql += ` GROUP BY me.id, me.name, me.occurs_at, me.tevo_popularity_score, v.name, v.city, v.state`;
+  sql += ` HAVING SUM(mtg.current_quantity) > 0 OR COUNT(mtg.id) = 0`;
+  sql += ` ORDER BY me.tevo_popularity_score DESC NULLS LAST, me.occurs_at ASC`;
   sql += ` LIMIT $${paramIndex++}`;
   queryParams.push(limit);
 
@@ -126,7 +127,7 @@ export async function searchEvents(params: EventSearchParams): Promise<EventResu
     event_id: row.event_id,
     title: row.title,
     event_date: row.event_date,
-    event_type: row.event_type,
+    event_type: undefined, // Column doesn't exist in master_events
     performer: row.performer,
     venue: row.venue,
     city: row.city,
@@ -147,21 +148,20 @@ export async function getEventById(eventId: number): Promise<EventResult | null>
   const sql = `
     SELECT DISTINCT
       me.id as event_id,
-      me.title,
-      me.event_date,
-      me.event_type,
-      me.popularity_score,
+      me.name as title,
+      me.occurs_at as event_date,
+      me.tevo_popularity_score as popularity_score,
       v.name as venue,
       v.city,
       v.state,
-      MIN(mtg.price) as min_price,
-      MAX(mtg.price) as max_price,
-      SUM(mtg.quantity_available) as total_tickets_available
+      MIN(mtg.retail_price) as min_price,
+      MAX(mtg.retail_price) as max_price,
+      SUM(mtg.current_quantity) as total_tickets_available
     FROM public.master_events me
-    LEFT JOIN public.venues v ON me.venue_id = v.id
-    LEFT JOIN public.master_ticketing_groups mtg ON me.id = mtg.event_id AND mtg.quantity_available > 0
+    LEFT JOIN public.master_venues v ON me.master_venue_id = v.id
+    LEFT JOIN public.master_ticketing_groups mtg ON me.id = mtg.event_id AND mtg.current_quantity > 0
     WHERE me.id = $1
-    GROUP BY me.id, me.title, me.event_date, me.event_type, me.popularity_score, v.name, v.city, v.state
+    GROUP BY me.id, me.name, me.occurs_at, me.tevo_popularity_score, v.name, v.city, v.state
   `;
 
   const result = await query(sql, [eventId]);
@@ -172,7 +172,7 @@ export async function getEventById(eventId: number): Promise<EventResult | null>
     event_id: row.event_id,
     title: row.title,
     event_date: row.event_date,
-    event_type: row.event_type,
+    event_type: undefined, // Column doesn't exist in master_events
     venue: row.venue,
     city: row.city,
     state: row.state,

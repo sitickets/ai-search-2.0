@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 import { searchRouter } from './routes/search';
 import { healthRouter } from './routes/health';
 import { chatRouter } from './routes/chat';
+import { typeaheadRouter } from './routes/typeahead';
 import { config } from './config/env';
 
 // Load environment variables
@@ -28,6 +29,7 @@ app.use(express.json());
 app.use('/api/health', healthRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/typeahead', typeaheadRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -38,7 +40,8 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       search: '/api/search',
-      chat: '/api/chat'
+      chat: '/api/chat',
+      typeahead: '/api/typeahead'
     }
   });
 });

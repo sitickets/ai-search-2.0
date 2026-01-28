@@ -271,8 +271,20 @@ export class EnhancedSearchService {
     
     // "next weekend"
     if (query.includes('next weekend')) {
-      const dayOfWeek = today.getDay();
-      const daysUntilNextSaturday = (6 - dayOfWeek + 7) % 7 + 7;
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
+      // Calculate days until next Saturday
+      let daysUntilNextSaturday: number;
+      if (dayOfWeek === 6) {
+        // Today is Saturday, next weekend is next week
+        daysUntilNextSaturday = 7;
+      } else if (dayOfWeek === 0) {
+        // Today is Sunday, next weekend is next Saturday (6 days)
+        daysUntilNextSaturday = 6;
+      } else {
+        // Calculate days until this Saturday, then add 7 for next weekend
+        const daysUntilThisSaturday = (6 - dayOfWeek + 7) % 7 || 7;
+        daysUntilNextSaturday = daysUntilThisSaturday === 0 ? 7 : daysUntilThisSaturday + 7;
+      }
       const nextSaturday = new Date(today);
       nextSaturday.setDate(today.getDate() + daysUntilNextSaturday);
       const nextSunday = new Date(nextSaturday);

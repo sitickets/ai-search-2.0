@@ -47,8 +47,8 @@ export async function searchByLocation(params: LocationSearchParams): Promise<Lo
   let sql = `
     SELECT DISTINCT
       me.id as event_id,
-      me.title as event_name,
-      me.event_date,
+      me.name as event_name,
+      me.occurs_at as event_date,
       v.name as venue,
       v.city,
       v.state,
@@ -57,11 +57,12 @@ export async function searchByLocation(params: LocationSearchParams): Promise<Lo
       v.longitude,
       MIN(mtg.price) as min_price,
       MAX(mtg.price) as max_price,
-      SUM(mtg.quantity_available) as total_tickets_available
+      SUM(mtg.current_quantity) as total_tickets_available
     FROM public.master_events me
-    INNER JOIN public.venues v ON me.venue_id = v.id
-    LEFT JOIN public.master_ticketing_groups mtg ON me.id = mtg.event_id AND mtg.quantity_available > 0
+    INNER JOIN public.master_venues v ON me.master_venue_id = v.id
+    LEFT JOIN public.master_ticketing_groups mtg ON me.id = mtg.event_id AND mtg.current_quantity > 0
     WHERE 1=1
+    AND me.occurs_at >= CURRENT_DATE
   `;
 
   const queryParams: any[] = [];
@@ -88,18 +89,18 @@ export async function searchByLocation(params: LocationSearchParams): Promise<Lo
   }
 
   if (dateFrom) {
-    sql += ` AND me.event_date >= $${paramIndex++}`;
+    sql += ` AND me.occurs_at >= $${paramIndex++}`;
     queryParams.push(dateFrom);
   }
 
   if (dateTo) {
-    sql += ` AND me.event_date <= $${paramIndex++}`;
+    sql += ` AND me.occurs_at <= $${paramIndex++}`;
     queryParams.push(dateTo);
   }
 
-  sql += ` GROUP BY me.id, me.title, me.event_date, v.name, v.city, v.state, v.zip_code, v.latitude, v.longitude`;
-  sql += ` HAVING SUM(mtg.quantity_available) > 0 OR COUNT(mtg.id) = 0`;
-  sql += ` ORDER BY me.event_date ASC`;
+  sql += ` GROUP BY me.id, me.name, me.occurs_at, v.name, v.city, v.state, v.zip_code, v.latitude, v.longitude`;
+  sql += ` HAVING SUM(mtg.current_quantity) > 0 OR COUNT(mtg.id) = 0`;
+  sql += ` ORDER BY me.occurs_at ASC`;
   sql += ` LIMIT $${paramIndex++}`;
   queryParams.push(limit);
 
@@ -140,9 +141,9 @@ export async function getPopularVenues(city?: string, state?: string, limit: num
       v.city,
       v.state,
       COUNT(DISTINCT me.id) as event_count,
-      COUNT(DISTINCT CASE WHEN me.event_date >= CURRENT_DATE THEN me.id END) as upcoming_events
-    FROM public.venues v
-    LEFT JOIN public.master_events me ON v.id = me.venue_id
+          COUNT(DISTINCT CASE WHEN me.occurs_at >= CURRENT_DATE THEN me.id END) as upcoming_events
+        FROM public.master_venues v
+        LEFT JOIN public.master_events me ON v.id = me.master_venue_id
     WHERE 1=1
   `;
 

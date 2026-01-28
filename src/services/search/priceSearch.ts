@@ -46,31 +46,32 @@ export async function searchByPrice(params: PriceSearchParams): Promise<PriceRes
     SELECT DISTINCT
       mtg.id as ticketing_group_id,
       mtg.event_id,
-      me.title as event_name,
-      me.event_date,
+      me.name as event_name,
+      me.occurs_at as event_date,
       mtg.section,
       mtg.row,
-      mtg.price,
-      mtg.quantity_available,
+      mtg.retail_price as price,
+      mtg.current_quantity as quantity_available,
       v.name as venue,
       v.city,
       v.state
     FROM public.master_ticketing_groups mtg
     INNER JOIN public.master_events me ON mtg.event_id = me.id
-    LEFT JOIN public.venues v ON me.venue_id = v.id
-    WHERE mtg.quantity_available > 0
+    LEFT JOIN public.master_venues v ON me.master_venue_id = v.id
+    WHERE mtg.current_quantity > 0
+    AND me.occurs_at >= CURRENT_DATE
   `;
 
   const queryParams: any[] = [];
   let paramIndex = 1;
 
   if (minPrice !== undefined) {
-    sql += ` AND mtg.price >= $${paramIndex++}`;
+    sql += ` AND mtg.retail_price >= $${paramIndex++}`;
     queryParams.push(minPrice);
   }
 
   if (maxPrice !== undefined) {
-    sql += ` AND mtg.price <= $${paramIndex++}`;
+    sql += ` AND mtg.retail_price <= $${paramIndex++}`;
     queryParams.push(maxPrice);
   }
 
@@ -80,7 +81,7 @@ export async function searchByPrice(params: PriceSearchParams): Promise<PriceRes
   }
 
   if (performer) {
-    sql += ` AND me.title ILIKE $${paramIndex++}`;
+    sql += ` AND me.name ILIKE $${paramIndex++}`;
     queryParams.push(`%${performer}%`);
   }
 
@@ -91,16 +92,16 @@ export async function searchByPrice(params: PriceSearchParams): Promise<PriceRes
   }
 
   if (dateFrom) {
-    sql += ` AND me.event_date >= $${paramIndex++}`;
+    sql += ` AND me.occurs_at >= $${paramIndex++}`;
     queryParams.push(dateFrom);
   }
 
   if (dateTo) {
-    sql += ` AND me.event_date <= $${paramIndex++}`;
+    sql += ` AND me.occurs_at <= $${paramIndex++}`;
     queryParams.push(dateTo);
   }
 
-  sql += ` ORDER BY mtg.price ASC, me.event_date ASC`;
+  sql += ` ORDER BY mtg.retail_price ASC, me.occurs_at ASC`;
   sql += ` LIMIT $${paramIndex++}`;
   queryParams.push(limit);
 
@@ -134,13 +135,13 @@ export interface PriceStats {
 export async function getPriceStats(eventId: number): Promise<PriceStats | null> {
   const sql = `
     SELECT 
-      MIN(price) as min_price,
-      MAX(price) as max_price,
-      AVG(price) as avg_price,
-      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median_price,
-      SUM(quantity_available) as total_tickets
+      MIN(retail_price) as min_price,
+      MAX(retail_price) as max_price,
+      AVG(retail_price) as avg_price,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY retail_price) as median_price,
+      SUM(current_quantity) as total_tickets
     FROM public.master_ticketing_groups
-    WHERE event_id = $1 AND quantity_available > 0
+    WHERE event_id = $1 AND current_quantity > 0
   `;
 
   const result = await query(sql, [eventId]);

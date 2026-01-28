@@ -163,9 +163,9 @@ export class ChatService {
       message: assistantMessage,
       conversation_id: convId,
       sources: {
-        db_results: dbResults.length > 0 ? dbResults : undefined,
-        web_results: webResults.length > 0 ? webResults : undefined,
-        ticket_links: ticketLinks.length > 0 ? ticketLinks : undefined // Explicit ticket links
+        db_results: dbResults.length > 0 ? dbResults : [],
+        web_results: webResults.length > 0 ? webResults : [],
+        ticket_links: ticketLinks.length > 0 ? ticketLinks : [] // Explicit ticket links - always return array
       },
       metadata: {
         query_type: this.detectQueryType(message),
@@ -197,9 +197,13 @@ When tickets are available:
 - Format links as markdown: [Event Name](https://sitickets.com/event/EVENT_ID)
 - If unsure between options, present 2-3 choices clearly with links for each
 - CRITICAL: Only mention events that match the date criteria in the user's query
+- CRITICAL: NEVER mention past dates or events that have already occurred
+- CRITICAL: All events in the database are future events (filtered to >= today), so NEVER use dates from web search results
 - If user asks for "this weekend", ONLY show events happening on Saturday or Sunday of this week
+- If user asks for "next weekend", ONLY show events happening on Saturday or Sunday of next week
 - If user asks for a specific date range, ONLY show events within that range
 - If no events match the date criteria, say "I didn't find any events for [date range]" and suggest alternative dates
+- ALWAYS use the exact event_date from the database context - do not use dates from web search results
 - Always end with a call to action
 
 When no tickets found:
@@ -261,11 +265,26 @@ ${history.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}`;
     let context = '';
 
     if (dbResults.length > 0) {
-      context += '\n=== AVAILABLE TICKETS ===\n';
+      // Filter out past events before processing
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const futureResults = dbResults.filter(result => {
+        if (!result.event_date) return true; // Include if no date
+        const eventDate = new Date(result.event_date);
+        eventDate.setHours(0, 0, 0, 0);
+        return eventDate >= today;
+      });
+
+      if (futureResults.length === 0) {
+        context += '\n=== NO FUTURE EVENTS FOUND ===\n';
+        return context;
+      }
+
+      context += '\n=== AVAILABLE TICKETS (Future Events Only) ===\n';
       
       // Group by event to show price ranges
       const eventGroups = new Map<string, any[]>();
-      dbResults.forEach((result) => {
+      futureResults.forEach((result) => {
         const eventKey = result.event_name || result.title || 'Unknown Event';
         if (!eventGroups.has(eventKey)) {
           eventGroups.set(eventKey, []);
@@ -293,6 +312,7 @@ ${history.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}`;
           const date = new Date(firstTicket.event_date);
           const dateStr = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
           context += `   Date: ${dateStr} (${date.toISOString().split('T')[0]})\n`;
+          context += `   IMPORTANT: This is a FUTURE event. Use this exact date in your response - do NOT use dates from web search.\n`;
         }
         if (minPrice !== null && maxPrice !== null) {
           if (minPrice === maxPrice) {

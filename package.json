@@ -10,6 +10,8 @@
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "test:connection": "tsx src/scripts/test-connection.ts",
+    "test:query-protection": "tsx src/scripts/test-query-protection.ts",
+    "test:query-protection:simple": "tsx src/scripts/test-query-protection-simple.ts",
     "deploy": "npm run build && serverless deploy",
     "deploy:dev": "npm run build && serverless deploy --stage dev",
     "deploy:prod": "npm run build && serverless deploy --stage prod",

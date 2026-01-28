@@ -3,8 +3,9 @@
  * Manages PostgreSQL connection pool and provides database utilities
  */
 
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, QueryResult } from 'pg';
 import { config } from '../config/env';
+import { queryProtection } from './queryProtection';
 
 let pool: Pool | null = null;
 
@@ -24,6 +25,7 @@ export function getPool(): Pool {
       max: dbConfig.poolMax(),
       idleTimeoutMillis: dbConfig.poolIdleTimeout(),
       connectionTimeoutMillis: dbConfig.poolConnectionTimeout(),
+      // Note: query timeout is handled in the query() function via Promise.race
     });
 
     // Handle pool errors
@@ -40,9 +42,68 @@ export async function getClient(): Promise<PoolClient> {
   return await pool.connect();
 }
 
-export async function query(text: string, params?: any[]) {
+/**
+ * Execute query with protection against slow/unoptimized queries
+ */
+export async function query(text: string, params?: any[]): Promise<QueryResult> {
   const pool = getPool();
-  return await pool.query(text, params);
+  const startTime = Date.now();
+
+  // 1. Validate query before execution
+  const validation = queryProtection.validateQuery(text, params);
+  if (!validation.allowed) {
+    throw new Error(`Query rejected: ${validation.reason}`);
+  }
+
+  // Log warnings if any
+  if (validation.warnings && validation.warnings.length > 0) {
+    console.warn('Query warnings:', validation.warnings);
+  }
+
+  try {
+    // 2. Set statement timeout if enabled
+    const timeoutSql = queryProtection.getStatementTimeoutSql();
+    if (timeoutSql) {
+      await pool.query(timeoutSql);
+    }
+
+    // 3. Execute query with timeout
+    const queryPromise = pool.query(text, params);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Query timeout: exceeded ${queryProtection.getConfig().maxQueryTimeMs}ms`));
+      }, queryProtection.getConfig().maxQueryTimeMs);
+    });
+    
+    const result = await Promise.race([queryPromise, timeoutPromise]);
+
+    // 4. Check execution time
+    const executionTime = Date.now() - startTime;
+    if (executionTime > 5000) { // Log slow queries (>5 seconds)
+      console.warn(`Slow query detected: ${executionTime}ms`, {
+        query: text.substring(0, 200), // Log first 200 chars
+        params: params?.length || 0
+      });
+    }
+
+    // 5. Limit result set size
+    if (result.rows && result.rows.length > queryProtection.getConfig().maxResultRows) {
+      console.warn(`Result set truncated from ${result.rows.length} to ${queryProtection.getConfig().maxResultRows} rows`);
+      result.rows = result.rows.slice(0, queryProtection.getConfig().maxResultRows);
+      result.rowCount = result.rows.length;
+    }
+
+    return result;
+  } catch (error: any) {
+    const executionTime = Date.now() - startTime;
+    console.error('Query error:', {
+      error: error.message,
+      executionTime: `${executionTime}ms`,
+      query: text.substring(0, 200),
+      params: params?.length || 0
+    });
+    throw error;
+  }
 }
 
 export async function closePool() {

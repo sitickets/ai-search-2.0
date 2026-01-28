@@ -57,21 +57,22 @@ export async function searchTickets(params: TicketSearchParams): Promise<TicketR
     SELECT DISTINCT
       mtg.id as ticket_id,
       mtg.event_id,
-      me.title as event_name,
-      me.event_date,
+      me.name as event_name,
+      me.occurs_at as event_date,
       mtg.section,
       mtg.row,
       mtg.seat_range as seat,
-      mtg.price,
-      mtg.quantity_available,
+      mtg.retail_price as price,
+      mtg.current_quantity as quantity_available,
       mtg.id as ticketing_group_id,
       v.name as venue,
       v.city,
       v.state
     FROM public.master_ticketing_groups mtg
     INNER JOIN public.master_events me ON mtg.event_id = me.id
-    LEFT JOIN public.venues v ON me.venue_id = v.id
+    LEFT JOIN public.master_venues v ON me.master_venue_id = v.id
     WHERE 1=1
+    AND me.occurs_at >= CURRENT_DATE
   `;
 
   const queryParams: any[] = [];
@@ -83,7 +84,7 @@ export async function searchTickets(params: TicketSearchParams): Promise<TicketR
   }
 
   if (performer) {
-    sql += ` AND me.title ILIKE $${paramIndex++}`;
+    sql += ` AND me.name ILIKE $${paramIndex++}`;
     queryParams.push(`%${performer}%`);
   }
 
@@ -114,22 +115,22 @@ export async function searchTickets(params: TicketSearchParams): Promise<TicketR
   }
 
   if (priceMin !== undefined) {
-    sql += ` AND mtg.price >= $${paramIndex++}`;
+    sql += ` AND mtg.retail_price >= $${paramIndex++}`;
     queryParams.push(priceMin);
   }
 
   if (priceMax !== undefined) {
-    sql += ` AND mtg.price <= $${paramIndex++}`;
+    sql += ` AND mtg.retail_price <= $${paramIndex++}`;
     queryParams.push(priceMax);
   }
 
   if (dateFrom) {
-    sql += ` AND me.event_date >= $${paramIndex++}`;
+    sql += ` AND me.occurs_at >= $${paramIndex++}`;
     queryParams.push(dateFrom);
   }
 
   if (dateTo) {
-    sql += ` AND me.event_date <= $${paramIndex++}`;
+    sql += ` AND me.occurs_at <= $${paramIndex++}`;
     queryParams.push(dateTo);
   }
 
@@ -144,12 +145,12 @@ export async function searchTickets(params: TicketSearchParams): Promise<TicketR
   }
 
   if (quantity !== undefined) {
-    sql += ` AND mtg.quantity_available >= $${paramIndex++}`;
+    sql += ` AND mtg.current_quantity >= $${paramIndex++}`;
     queryParams.push(quantity);
   }
 
-  sql += ` AND mtg.quantity_available > 0`;
-  sql += ` ORDER BY me.event_date ASC, mtg.price ASC`;
+  sql += ` AND mtg.current_quantity > 0`;
+  sql += ` ORDER BY me.occurs_at ASC, mtg.retail_price ASC`;
   sql += ` LIMIT $${paramIndex++}`;
   queryParams.push(limit);
 
