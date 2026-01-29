@@ -110,8 +110,17 @@ export class ChatService {
         if (user_city || user_state) {
           dbResults = this.prioritizeByLocation(dbResults, user_city, user_state);
         }
-      } catch (error) {
-        console.error('DB search error:', error);
+      } catch (error: any) {
+        console.error('[CHAT-SERVICE] DB search error:', {
+          error: error.message,
+          stack: error.stack,
+          query: message
+        });
+        // Don't fail the entire request if DB search times out
+        // User will still get a response, just without DB results
+        if (error.message?.includes('timeout')) {
+          console.warn('[CHAT-SERVICE] DB search timed out, continuing without DB results');
+        }
       }
     }
 
@@ -130,7 +139,18 @@ export class ChatService {
     const context = this.buildContext(dbResults, webResults, user_location, user_city, user_state);
 
     // Generate response using Ollama
-    const assistantMessage = await this.generateResponse(conversationHistory, context, dbResults);
+    let assistantMessage: string;
+    try {
+      assistantMessage = await this.generateResponse(conversationHistory, context, dbResults);
+    } catch (error: any) {
+      console.error('[CHAT-SERVICE] Error generating response:', error.message);
+      // Provide a helpful error message if DB search timed out
+      if (error.message?.includes('timeout') || dbResults.length === 0) {
+        assistantMessage = "I'm having trouble searching the database right now. This might be due to a timeout. Please try:\n\n1. Being more specific with your search (e.g., 'concerts in Westchester NY this weekend')\n2. Searching for a specific artist or venue\n3. Trying again in a moment\n\nI can still help you with general questions about tickets and events!";
+      } else {
+        assistantMessage = "I encountered an error while processing your request. Please try rephrasing your question or try again in a moment.";
+      }
+    }
 
     // Add assistant response to history
     conversationHistory.push({
@@ -194,7 +214,8 @@ CRITICAL INSTRUCTIONS:
 When tickets are available:
 - Start with: "Great! I found tickets for [artist/event]"
 - For EACH event, list: Event name, Venue, Date, Price range, AND the ticket link
-- Format links as markdown: [Event Name](https://sitickets.com/event/EVENT_ID)
+- Format links as markdown: [Event Name](https://sitickets.com/event/ACTUAL_EVENT_ID_NUMBER)
+- CRITICAL: Use the actual numeric Event ID from the context (e.g., 1234567), NOT placeholders like "EVENT_ID" or "LUMINEERS_EVENT_ID"
 - If unsure between options, present 2-3 choices clearly with links for each
 - CRITICAL: Only mention events that match the date criteria in the user's query
 - CRITICAL: NEVER mention past dates or events that have already occurred
@@ -328,8 +349,10 @@ ${history.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n')}`;
         const eventId = firstTicket.event_id || firstTicket.ticket_id;
         if (eventId) {
           const ticketLink = `https://sitickets.com/event/${eventId}`;
+          context += `   Event ID: ${eventId}\n`;
           context += `   Ticket Link: ${ticketLink}\n`;
-          context += `   REQUIRED: You MUST include this link in your response as: [${eventName}](${ticketLink})\n`;
+          context += `   REQUIRED: You MUST include this EXACT link in your response as: [${eventName}](${ticketLink})\n`;
+          context += `   CRITICAL: Use the actual Event ID ${eventId} in the link, NOT a placeholder like "EVENT_ID" or "${eventName.toUpperCase().replace(/\s+/g, '_')}_EVENT_ID"\n`;
         }
         
         if (tickets.length > 1) {

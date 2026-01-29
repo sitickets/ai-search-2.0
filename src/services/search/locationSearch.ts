@@ -55,8 +55,8 @@ export async function searchByLocation(params: LocationSearchParams): Promise<Lo
       v.zip_code,
       v.latitude,
       v.longitude,
-      MIN(mtg.price) as min_price,
-      MAX(mtg.price) as max_price,
+      MIN(mtg.retail_price) as min_price,
+      MAX(mtg.retail_price) as max_price,
       SUM(mtg.current_quantity) as total_tickets_available
     FROM public.master_events me
     INNER JOIN public.master_venues v ON me.master_venue_id = v.id
